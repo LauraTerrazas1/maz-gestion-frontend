@@ -24,3 +24,35 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+:root {
+  --maz-blue: #2F73D9;
+  --maz-blue-dark: #102033;
+  --maz-blue-hover: #245DB3;
+  --maz-green: #92C83E;
+  --maz-bg: #F6F8FB;
+}
+
+body {
+  background: var(--maz-bg);
+}
+
+/* Stepper pulse animation for current step */
+.step-pulse {
+  animation: step-pulse 2s infinite;
+}
+
+@keyframes step-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(47,115,217,0.15);
+  }
+  70% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 8px rgba(47,115,217,0.06);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(47,115,217,0);
+  }
+}
