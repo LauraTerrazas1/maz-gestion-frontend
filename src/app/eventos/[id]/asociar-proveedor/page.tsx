@@ -37,13 +37,7 @@ export default function AsociarProveedorPage() {
   const [form, setForm] = useState({
     proveedor_id: "",
     servicio: "",
-    monto_contratado: "",
     observaciones: "",
-    agregar_programacion: false,
-    tipo_programacion: "",
-    monto_programado: "",
-    fecha_programada: "",
-    observaciones_programacion: "",
   });
 
   useEffect(() => {
@@ -85,35 +79,20 @@ export default function AsociarProveedorPage() {
     setGuardando(true);
 
     try {
-      const relacionCreada = await apiFetch("/evento-proveedores/", {
+      await apiFetch("/evento-proveedores/", {
         method: "POST",
         body: JSON.stringify({
           evento_id: params.id,
           proveedor_id: form.proveedor_id,
           servicio: form.servicio.trim(),
-          monto_contratado: Number(form.monto_contratado),
-          estado: "activo",
+          monto_contratado: 0,
           observaciones:
-            form.observaciones.trim() === "" ? null : form.observaciones.trim(),
+            form.observaciones.trim() === ""
+              ? null
+              : form.observaciones.trim(),
         }),
       });
-      if (form.agregar_programacion) {
-        await apiFetch("/programaciones-pago/", {
-          method: "POST",
-          body: JSON.stringify({
-            evento_id: params.id,
-            evento_proveedor_id: relacionCreada.id,
-            tipo_programacion: form.tipo_programacion,
-            monto: Number(form.monto_programado),
-            fecha_programada: form.fecha_programada,
-            observaciones:
-              form.observaciones_programacion.trim() === ""
-                ? null
-                : form.observaciones_programacion.trim(),
-            estado: "pendiente",
-          }),
-        });
-      }
+
       router.push(`/eventos/${params.id}`);
     } catch (error) {
       console.error("Error asociando proveedor:", error);
@@ -150,7 +129,7 @@ export default function AsociarProveedorPage() {
               Datos de la asociacion
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              El servicio y monto contratado pertenecen a este evento especifico.
+              Selecciona el proveedor e indica el servicio que brindará en este evento.
             </p>
 
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -189,23 +168,6 @@ export default function AsociarProveedorPage() {
                 />
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-[#102033]">
-                  Monto contratado (S/)
-                </label>
-                <input
-                  type="number"
-                  name="monto_contratado"
-                  value={form.monto_contratado}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                  required
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none focus:border-[#2F73D9]"
-                />
-              </div>
-
               <div className="md:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-[#102033]">
                   Observaciones
@@ -220,85 +182,6 @@ export default function AsociarProveedorPage() {
                 />
               </div>
             </div>
-          </section>
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <label className="flex items-center gap-3 text-sm font-semibold text-[#102033]">
-              <input
-                type="checkbox"
-                name="agregar_programacion"
-                checked={form.agregar_programacion}
-                onChange={handleChange}
-                className="h-4 w-4"
-              />
-              Agregar programación de pago inicial
-            </label>
-
-            {form.agregar_programacion && (
-              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-[#102033]">
-                    Tipo de programación
-                  </label>
-                  <select
-                    name="tipo_programacion"
-                    value={form.tipo_programacion}
-                    onChange={handleChange}
-                    required={form.agregar_programacion}
-                    className={selectClassName}
-                  >
-                    <option value="">Seleccionar tipo</option>
-                    <option value="adelanto">Adelanto</option>
-                    <option value="saldo_final">Saldo final</option>
-                    <option value="pago_unico">Pago único</option>
-                    <option value="otro">Otro</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-[#102033]">
-                    Monto programado (S/)
-                  </label>
-                  <input
-                    type="number"
-                    name="monto_programado"
-                    value={form.monto_programado}
-                    onChange={handleChange}
-                    min="0"
-                    step="0.01"
-                    required={form.agregar_programacion}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none focus:border-[#2F73D9]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-[#102033]">
-                    Fecha programada
-                  </label>
-                  <input
-                    type="date"
-                    name="fecha_programada"
-                    value={form.fecha_programada}
-                    onChange={handleChange}
-                    required={form.agregar_programacion}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none focus:border-[#2F73D9]"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-[#102033]">
-                    Observaciones de programación
-                  </label>
-                  <textarea
-                    name="observaciones_programacion"
-                    value={form.observaciones_programacion}
-                    onChange={handleChange}
-                    rows={3}
-                    placeholder="Ej. 50% al inicio, saldo contra entrega..."
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none focus:border-[#2F73D9]"
-                  />
-                </div>
-              </div>
-            )}
           </section>
           <div className="flex justify-end gap-3 pb-8">
             <Link
