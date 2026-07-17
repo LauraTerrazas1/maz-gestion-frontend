@@ -86,6 +86,16 @@ type Pago = {
     } | null;
 };
 
+type PersonalEventualGrupo = {
+    id: string;
+    evento_id: string;
+    cargo_funcion?: string | null;
+    cantidad_personas?: number | null;
+    pago_unitario?: number | string | null;
+    monto_total?: number | string | null;
+    estado?: string | null;
+};
+
 type IconName =
     | "wallet"
     | "arrow-down-circle"
@@ -99,8 +109,9 @@ type IconName =
     | "alert-triangle";
 
 function formatearEstado(estado: string) {
-    if (estado === "planificacion") return "En planificacion";
+    if (estado === "planificacion") return "En planificación";
     if (estado === "en_curso") return "En curso";
+    if (estado === "pendiente_cierre") return "Pendiente de cierre";
     if (estado === "finalizado") return "Finalizado";
     if (estado === "pagado_sin_comprobante") return "Pagado sin comprobante";
     return estado?.replaceAll("_", " ");
@@ -131,11 +142,22 @@ function estadoBadgeClass(estado: string) {
         return "border-green-200 bg-green-50 text-green-700";
     }
 
+    if (estado === "en_curso") {
+        return "border-blue-200 bg-blue-50 text-blue-700";
+    }
+
+    if (estado === "pendiente_cierre") {
+        return "border-orange-200 bg-orange-50 text-orange-700";
+    }
+
     if (estado === "pendiente" || estado === "planificacion") {
         return "border-amber-200 bg-amber-50 text-amber-700";
     }
 
-    if (estado === "pagado_sin_comprobante" || estado === "comprobante_pendiente") {
+    if (
+        estado === "pagado_sin_comprobante" ||
+        estado === "comprobante_pendiente"
+    ) {
         return "border-sky-200 bg-sky-50 text-sky-700";
     }
 
@@ -145,14 +167,6 @@ function estadoBadgeClass(estado: string) {
 
     if (estado === "inactivo") {
         return "border-slate-200 bg-slate-100 text-slate-600";
-    }
-
-    if (estado === "en_curso") {
-        return "border-blue-200 bg-blue-50 text-blue-700";
-    }
-
-    if (estado === "finalizado") {
-        return "border-slate-300 bg-slate-100 text-slate-700";
     }
 
     return "border-slate-200 bg-slate-50 text-slate-600";
@@ -201,6 +215,7 @@ export default function DetalleEventoPage() {
     const [proveedores, setProveedores] = useState<EventoProveedor[]>([]);
     const [programaciones, setProgramaciones] = useState<ProgramacionPago[]>([]);
     const [pagos, setPagos] = useState<Pago[]>([]);
+    const [personalEventual, setPersonalEventual] = useState<PersonalEventualGrupo[]>([]);
 
     async function cargarEvento() {
         const eventoId = params.id;
@@ -221,6 +236,15 @@ export default function DetalleEventoPage() {
             ? pagosData.filter((pago: Pago) => pago.evento_id === eventoId)
             : [];
         setPagos(pagosEvento);
+        const personalData = await apiFetch(`/personal-eventual/grupos/evento/${eventoId}`);
+        setPersonalEventual(Array.isArray(personalData) ? personalData : []);
+        const personalEvento = Array.isArray(personalData)
+            ? personalData.filter(
+                (item: PersonalEventualGrupo) => item.evento_id === eventoId
+            )
+            : [];
+
+        setPersonalEventual(personalEvento);
     }
 
     async function eliminarProveedorAsociado(relacionId: string) {
@@ -269,10 +293,17 @@ export default function DetalleEventoPage() {
         }).format(Number(value || 0));
     }
 
-    const totalComprometido = proveedores.reduce(
-        (acc, item) => acc + Number(item.monto_contratado || 0),
+    const totalPersonalEventual = personalEventual.reduce(
+        (acc, item) =>
+            acc + Number(item.monto_total || Number(item.cantidad_personas || 0) * Number(item.pago_unitario || 0)),
         0
     );
+
+    const totalComprometido =
+        proveedores.reduce(
+            (acc, item) => acc + Number(item.monto_contratado || 0),
+            0
+        ) + totalPersonalEventual;
 
     const totalProgramado = programaciones.reduce(
         (acc, item) => acc + Number(item.monto || 0),
@@ -288,12 +319,13 @@ export default function DetalleEventoPage() {
     }, 0);
 
     const totalPendiente = totalProgramado - totalPagado;
+
     const saldoPendienteClienteCapacidad =
         Number(evento.presupuesto_aprobado || 0) -
         Number(evento.monto_recibido_cliente || 0);
-    const pendientePersonalEventual = 0;
-    const obligacionesPendientes =
-        totalComprometido - totalPagado + pendientePersonalEventual;
+
+    const obligacionesPendientes = totalComprometido - totalPagado;
+
     const capacidadPago = saldoPendienteClienteCapacidad - obligacionesPendientes;
     const capacidadPagoOk = capacidadPago >= 0;
     const montoCapacidadPago = Math.abs(capacidadPago);
@@ -478,6 +510,26 @@ export default function DetalleEventoPage() {
                                 <span className="h-2.5 w-2.5 rounded-full bg-[#2F73D9]" />
                                 {formatearEstado(evento.estado)}
                             </span>
+                            {evento.estado === "pendiente_cierre" && (
+                                <button
+                                    onClick={async () => {
+                                        const confirmar = confirm(
+                                            "¿Deseas finalizar este evento? Una vez finalizado pasará al historial."
+                                        );
+
+                                        if (!confirmar) return;
+
+                                        await apiFetch(`/eventos/${evento.id}/finalizar`, {
+                                            method: "PUT",
+                                        });
+
+                                        window.location.reload();
+                                    }}
+                                    className="mt-3 w-full rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                                >
+                                    Finalizar evento
+                                </button>
+                            )}
                         </div>
                         <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
                             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#2F73D9]">Color identificador</p>

@@ -56,6 +56,22 @@ const navItems = [
     ),
   },
   {
+    href: "/ordenes-compra",
+    label: "Órdenes de Compra",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+        <path
+          d="M9 5h6M9 9h6M9 13h4M7 3h10a2 2 0 0 1 2 2v16H5V5a2 2 0 0 1 2-2Zm2-1h6v4H9V2Z"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/pagos",
     label: "Pagos",
     icon: (

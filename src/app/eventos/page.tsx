@@ -43,10 +43,11 @@ export default function EventosPage() {
         const data = await apiFetch("/eventos/");
         const activos = Array.isArray(data)
           ? data.filter(
-              (evento: Evento) =>
-                evento.estado === "planificacion" ||
-                evento.estado === "en_curso"
-            )
+            (evento: Evento) =>
+              evento.estado === "planificacion" ||
+              evento.estado === "en_curso" ||
+              evento.estado === "pendiente_cierre"
+          )
           : [];
         setEventos(activos);
       } catch (error) {
@@ -68,6 +69,7 @@ export default function EventosPage() {
   function formatearEstado(estado: string) {
     if (estado === "planificacion") return "En planificación";
     if (estado === "en_curso") return "En curso";
+    if (estado === "pendiente_cierre") return "Pendiente de cierre";
     if (estado === "finalizado") return "Finalizado";
     return estado;
   }

@@ -12,12 +12,23 @@ type Alerta = {
   evento_id: string | null;
   pago_id: string | null;
   programacion_pago_id: string | null;
+  personal_grupo_id?: string | null;
   tipo_alerta: string;
   origen: string | null;
   titulo: string;
   descripcion: string | null;
   fecha_alerta: string;
   estado: string;
+
+  proveedor_nombre?: string | null;
+  servicio?: string | null;
+  grupo_nombre?: string | null;
+  cargo?: string | null;
+  cantidad_personas?: number | null;
+  monto?: number | null;
+  evento_nombre?: string | null;
+  responsable?: string | null;
+  concepto?: string | null;
 };
 
 export default function AlertasPage() {
@@ -130,6 +141,34 @@ export default function AlertasPage() {
     return "border-slate-200 bg-slate-50 text-slate-600";
   }
 
+  function esPersonalEventual(alerta: Alerta) {
+    return (
+      alerta.origen === "personal_eventual" ||
+      alerta.tipo_alerta === "personal_eventual_pendiente" ||
+      !!alerta.personal_grupo_id
+    );
+  }
+
+  function obtenerDestinatario(alerta: Alerta) {
+    return alerta.responsable || alerta.proveedor_nombre || alerta.grupo_nombre || alerta.cargo || "No registrado";
+  }
+
+  function origenBadgeClass(alerta: Alerta) {
+    if (esPersonalEventual(alerta)) {
+      return "border-purple-200 bg-purple-50 text-purple-700";
+    }
+
+    return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+  function obtenerMonto(alerta: Alerta) {
+    if (alerta.monto !== null && alerta.monto !== undefined) {
+      return alerta.monto;
+    }
+
+    const match = alerta.descripcion?.match(/S\/\s?(\d+(\.\d+)?)/);
+    return match ? Number(match[1]) : null;
+  }
+
   const alertasFiltradas = alertas
     .filter((alerta) => {
       if (filtro === "todas") return true;
@@ -223,16 +262,49 @@ export default function AlertasPage() {
                         </span>
                       </td>
 
-                      <td className="px-6 py-4 text-slate-600">
-                        {alerta.origen || "No registrado"}
+                      <td className="w-[210px] px-6 py-4">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${esPersonalEventual(alerta)
+                              ? "bg-purple-100 text-purple-700"
+                              : "bg-blue-100 text-blue-700"
+                              }`}
+                          >
+                            {esPersonalEventual(alerta) ? "PE" : "P"}
+                          </div>
+
+                          <div className="min-w-0 max-w-[150px]">
+                            <div
+                              className={`mb-1 inline-flex max-w-full rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${esPersonalEventual(alerta)
+                                ? "bg-purple-50 text-purple-700 ring-1 ring-purple-200"
+                                : "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                                }`}
+                            >
+                              {esPersonalEventual(alerta) ? "Personal" : "Proveedor"}
+                            </div>
+
+                            <p className="truncate text-sm font-semibold text-[#102033]">
+                              {obtenerDestinatario(alerta)}
+                            </p>
+
+                            <p className="truncate text-xs text-slate-500">
+                              {alerta.concepto || alerta.servicio || "Sin detalle"}
+                            </p>
+                          </div>
+                        </div>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 max-w-[420px]">
                         <p className="font-semibold text-[#102033]">
-                          {alerta.titulo}
+                          {alerta.concepto || alerta.servicio || "Pago programado"}
                         </p>
-                        <p className="text-slate-500">
-                          {alerta.descripcion || "Sin descripción"}
+
+                        <p className="text-sm font-semibold text-slate-700">
+                          Monto: S/ {obtenerMonto(alerta)?.toFixed(2) || "--"}
+                        </p>
+
+                        <p className="mt-1 text-xs font-medium text-slate-600">
+                          Evento: {alerta.evento_nombre || "Sin evento"}
                         </p>
                       </td>
 
@@ -303,7 +375,18 @@ export default function AlertasPage() {
 
               <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <DetalleItem label="Título" value={alertaSeleccionada.titulo} />
-                <DetalleItem label="Origen" value={alertaSeleccionada.origen || "No registrado"} />
+                <DetalleItem
+                  label="Responsable"
+                  value={obtenerDestinatario(alertaSeleccionada)}
+                />
+                <DetalleItem
+                  label="Evento"
+                  value={alertaSeleccionada.evento_nombre || "Sin evento"}
+                />
+                <DetalleItem
+                  label="Concepto"
+                  value={alertaSeleccionada.concepto || alertaSeleccionada.servicio || alertaSeleccionada.evento_nombre || "Sin concepto"}
+                />
                 <DetalleItem label="Fecha" value={alertaSeleccionada.fecha_alerta} />
                 <DetalleItem label="Estado" value={alertaSeleccionada.estado} />
               </div>
