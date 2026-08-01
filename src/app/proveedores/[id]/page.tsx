@@ -66,17 +66,63 @@ export default function DetalleProveedorPage() {
     }
 
     async function desactivarProveedor() {
+        if (!proveedor?.id) return;
+
         try {
-            await apiFetch(`/proveedores/${proveedor?.id}`, {
+            await apiFetch(`/proveedores/${proveedor.id}`, {
                 method: "DELETE",
             });
 
-            window.location.href = "/proveedores";
+            setProveedor((actual) =>
+                actual
+                    ? {
+                        ...actual,
+                        estado: "inactivo",
+                    }
+                    : actual
+            );
+
+            setToast({
+                tipo: "success",
+                mensaje: "Proveedor desactivado correctamente.",
+            });
         } catch (error) {
             console.error("Error desactivando proveedor:", error);
+
             setToast({
                 tipo: "error",
                 mensaje: "No se pudo desactivar el proveedor.",
+            });
+        }
+    }
+
+    async function activarProveedor() {
+        if (!proveedor?.id) return;
+
+        try {
+            await apiFetch(`/proveedores/${proveedor.id}/activar`, {
+                method: "PUT",
+            });
+
+            setProveedor((actual) =>
+                actual
+                    ? {
+                        ...actual,
+                        estado: "activo",
+                    }
+                    : actual
+            );
+
+            setToast({
+                tipo: "success",
+                mensaje: "Proveedor activado correctamente.",
+            });
+        } catch (error) {
+            console.error("Error activando proveedor:", error);
+
+            setToast({
+                tipo: "error",
+                mensaje: "No se pudo activar el proveedor.",
             });
         }
     }
@@ -133,6 +179,7 @@ export default function DetalleProveedorPage() {
                         <h1 className="text-3xl font-bold text-[#102033]">
                             {valor(proveedor.razon_social)}
                         </h1>
+
                         <p className="mt-1 text-sm text-slate-500">
                             Ficha general del proveedor registrado en MAZ Producciones.
                         </p>
@@ -146,13 +193,23 @@ export default function DetalleProveedorPage() {
                             Editar proveedor
                         </Link>
 
-                        <button
-                            type="button"
-                            onClick={desactivarProveedor}
-                            className="rounded-lg border border-orange-200 bg-orange-50 px-5 py-2.5 text-sm font-semibold text-orange-600 hover:bg-orange-100"
-                        >
-                            Desactivar
-                        </button>
+                        {proveedor.estado === "activo" ? (
+                            <button
+                                type="button"
+                                onClick={desactivarProveedor}
+                                className="rounded-lg border border-orange-200 bg-orange-50 px-5 py-2.5 text-sm font-semibold text-orange-600 hover:bg-orange-100"
+                            >
+                                Desactivar
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={activarProveedor}
+                                className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                            >
+                                Activar
+                            </button>
+                        )}
                     </div>
                 </div>
 

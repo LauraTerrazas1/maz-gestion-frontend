@@ -24,6 +24,7 @@ type ProveedorForm = {
   tipo_cuenta: string;
   numero_cuenta: string;
   cci: string;
+  cuenta_detracciones_bn: string;
   moneda: string;
   titular_cuenta: string;
   estado: string;
@@ -44,6 +45,7 @@ const initialForm: ProveedorForm = {
   tipo_cuenta: "",
   numero_cuenta: "",
   cci: "",
+  cuenta_detracciones_bn: "",
   moneda: "PEN",
   titular_cuenta: "",
   estado: "activo",
@@ -94,6 +96,7 @@ export default function EditarProveedorPage() {
           tipo_cuenta: data.tipo_cuenta || "",
           numero_cuenta: data.numero_cuenta || "",
           cci: data.cci || "",
+          cuenta_detracciones_bn: data.cuenta_detracciones_bn || "",
           moneda: data.moneda || "PEN",
           titular_cuenta: data.titular_cuenta || "",
           estado: data.estado || "activo",
@@ -142,6 +145,7 @@ export default function EditarProveedorPage() {
           tipo_cuenta: limpiarOpcional(form.tipo_cuenta),
           numero_cuenta: limpiarOpcional(form.numero_cuenta),
           cci: limpiarOpcional(form.cci),
+          cuenta_detracciones_bn: limpiarOpcional(form.cuenta_detracciones_bn),
           moneda: form.moneda || "PEN",
           titular_cuenta: limpiarOpcional(form.titular_cuenta),
           estado: form.estado || "activo",
@@ -161,8 +165,8 @@ export default function EditarProveedorPage() {
     form.tipo_proveedor === "persona"
       ? "DNI"
       : form.tipo_proveedor === "empresa"
-      ? "RUC"
-      : "Documento";
+        ? "RUC"
+        : "Documento";
 
   if (cargando) {
     return (
@@ -356,6 +360,13 @@ export default function EditarProveedorPage() {
                 label="CCI"
                 name="cci"
                 value={form.cci}
+                onChange={handleChange}
+              />
+
+              <Campo
+                label="Cuenta de detracciones BN"
+                name="cuenta_detracciones_bn"
+                value={form.cuenta_detracciones_bn}
                 onChange={handleChange}
               />
 

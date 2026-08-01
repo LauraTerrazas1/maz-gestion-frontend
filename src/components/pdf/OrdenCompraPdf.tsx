@@ -28,6 +28,7 @@ export type OrdenCompraPdfData = {
 
   moneda: string;
   condiciones_pago?: string | null;
+  porcentaje_max_adelanto?: number | string | null;
   observaciones?: string | null;
 
   porcentaje_igv: number | string;
@@ -319,6 +320,25 @@ const styles = StyleSheet.create({
     borderColor: "#D8E0E8",
     padding: 8,
     lineHeight: 1.35,
+  },
+  requisitosBox: {
+    marginTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#BFC7D1",
+    paddingTop: 10,
+  },
+
+  requisitosTitulo: {
+    fontSize: 8,
+    fontWeight: 700,
+    marginBottom: 6,
+  },
+
+  requisito: {
+    fontSize: 7.5,
+    lineHeight: 1.5,
+    marginBottom: 4,
+    textAlign: "justify",
   },
 
   footer: {
@@ -660,6 +680,45 @@ export default function OrdenCompraPdf({ orden }: Props) {
           <Text style={styles.observations}>
             {orden.observaciones ||
               "No se registraron observaciones."}
+          </Text>
+        </View>
+        <View style={styles.requisitosBox} wrap={false}>
+          <Text style={styles.requisitosTitulo}>
+            Para el trámite de su Factura, debe tener en cuenta los siguientes requisitos:
+          </Text>
+
+          <Text style={styles.requisito}>
+            1. El proveedor deberá emitir su Factura o Recibo por Honorarios Electrónico
+            (RHE) dentro de los tres (3) días calendario siguientes a la recepción de la
+            presente Orden de Compra.
+          </Text>
+
+          <Text style={styles.requisito}>
+            2. Los ítems e importes de la Factura deben ser los mismos que la Orden de
+            Compra o Servicio.
+          </Text>
+
+          <Text style={styles.requisito}>
+            3. Enviar al correo contabilidad@mazproducciones.com la Orden de Compra y la
+            Factura/RHE en un solo archivo PDF. Asimismo, si la factura está sujeta al
+            Sistema de Pago de Obligaciones Tributarias (SPOT), deberá incluir el número
+            de cuenta del Banco de la Nación, el código de detracción del bien o servicio
+            y el porcentaje correspondiente. La factura que no presente esta información
+            no será recibida.
+          </Text>
+
+          <Text style={styles.requisito}>
+            4. Si el importe de la Factura corresponde a un adelanto, este no deberá
+            exceder el{" "}
+            <Text style={{ fontWeight: 700 }}>
+              {Number(orden.porcentaje_max_adelanto ?? 60).toFixed(0)}%
+            </Text>{" "}
+            del monto total presupuestado.
+          </Text>
+
+          <Text style={styles.requisito}>
+            5. Los plazos de pago se darán según lo estipulado en las condiciones de pago
+            que figuran en el cuadro superior de la presente Orden de Compra o Servicio.
           </Text>
         </View>
 

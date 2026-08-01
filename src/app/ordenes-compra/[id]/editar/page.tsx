@@ -64,6 +64,8 @@ export default function EditarOrdenCompraPage() {
   const [moneda, setMoneda] = useState("PEN");
   const [condicionesPago, setCondicionesPago] = useState("");
   const [porcentajeIgv, setPorcentajeIgv] = useState(18);
+  const [porcentajeMaxAdelanto, setPorcentajeMaxAdelanto] =
+    useState("60");
   const [observaciones, setObservaciones] = useState("");
   const [requiereFactura, setRequiereFactura] = useState(true);
 
@@ -159,6 +161,9 @@ export default function EditarOrdenCompraPage() {
         );
         setPorcentajeIgv(
           Number(data.porcentaje_igv ?? 18)
+        );
+        setPorcentajeMaxAdelanto(
+          String(data.porcentaje_max_adelanto ?? 60)
         );
         setObservaciones(data.observaciones || "");
         setRequiereFactura(
@@ -392,6 +397,10 @@ export default function EditarOrdenCompraPage() {
           condiciones_pago:
             condicionesPago.trim() || null,
           porcentaje_igv: porcentajeIgv,
+          porcentaje_max_adelanto:
+            porcentajeMaxAdelanto === ""
+              ? 0
+              : Number(porcentajeMaxAdelanto),
           observaciones:
             observaciones.trim() || null,
           requiere_factura: requiereFactura,
@@ -676,7 +685,8 @@ export default function EditarOrdenCompraPage() {
                   onChange={(event) =>
                     setCondicionesPago(event.target.value)
                   }
-                  placeholder="Ej. 50% de adelanto y 50% al finalizar"
+                  placeholder="Ej. Transferencia bancaria."
+
                   rows={3}
                   className={inputClass}
                 />
@@ -769,7 +779,7 @@ export default function EditarOrdenCompraPage() {
               Información adicional
             </h2>
 
-            <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-[220px_260px_1fr]">
               <Campo label="IGV (%)">
                 <input
                   type="number"
@@ -784,7 +794,20 @@ export default function EditarOrdenCompraPage() {
                   className={inputClass}
                 />
               </Campo>
-
+              <Campo label="Adelanto máximo permitido (%)">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={porcentajeMaxAdelanto}
+                  onChange={(event) =>
+                    setPorcentajeMaxAdelanto(event.target.value)
+                  }
+                  onWheel={(event) => event.currentTarget.blur()}
+                  className={inputClass}
+                />
+              </Campo>
               <Campo label="Observaciones">
                 <textarea
                   value={observaciones}

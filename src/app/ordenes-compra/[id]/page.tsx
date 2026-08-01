@@ -32,6 +32,7 @@ type OrdenCompra = {
 
   moneda: string;
   condiciones_pago?: string | null;
+  porcentaje_max_adelanto?: number | string | null;
   observaciones?: string | null;
 
   porcentaje_igv: number | string;
@@ -489,7 +490,7 @@ export default function DetalleOrdenCompraPage() {
 
                   {/* Condiciones */}
                   <section className="overflow-hidden rounded-2xl border border-slate-200">
-                    <div className="grid md:grid-cols-4">
+                    <div className="grid md:grid-cols-5">
                       <DatoCondicion
                         etiqueta="Lugar de entrega"
                         valor={
@@ -511,7 +512,12 @@ export default function DetalleOrdenCompraPage() {
                         etiqueta="Moneda"
                         valor={textoMoneda(orden.moneda)}
                       />
-
+                      <DatoCondicion
+                        etiqueta="Adelanto máximo"
+                        valor={`${Number(
+                          orden.porcentaje_max_adelanto ?? 60
+                        ).toFixed(0)}%`}
+                      />
                       <DatoCondicion
                         etiqueta="Fecha requerida"
                         valor={formatearFecha(
@@ -703,6 +709,50 @@ export default function DetalleOrdenCompraPage() {
                     <div className="min-h-24 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-700">
                       {orden.observaciones ||
                         "No se registraron observaciones."}
+                    </div>
+                  </SeccionDocumento>
+                  <SeccionDocumento titulo="Requisitos para el trámite de la factura">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-7 text-slate-700">
+                      <ol className="list-decimal space-y-3 pl-5">
+                        <li>
+                          El proveedor deberá emitir su Factura o Recibo por Honorarios
+                          Electrónico (RHE) dentro de los tres (3) días calendario
+                          siguientes a la recepción de la presente Orden de Compra.
+                        </li>
+
+                        <li>
+                          Los ítems e importes de la Factura deben ser los mismos que la
+                          Orden de Compra o Servicio.
+                        </li>
+
+                        <li>
+                          Enviar al correo <strong>contabilidad@mazproducciones.com</strong>{" "}
+                          la Orden de Compra y la Factura/RHE en un solo archivo PDF.
+                          Asimismo, si la factura está sujeta al Sistema de Pago de
+                          Obligaciones Tributarias (SPOT), deberá incluir el número de
+                          cuenta del Banco de la Nación, el código de detracción del bien o
+                          servicio y el porcentaje correspondiente. La factura que no
+                          presente esta información no será recibida.
+                        </li>
+
+                        <li>
+                          Si el importe de la Factura corresponde a un adelanto, este no
+                          deberá exceder el{" "}
+                          <strong>
+                            {Number(
+                              orden.porcentaje_max_adelanto ?? 60
+                            ).toFixed(0)}
+                            %
+                          </strong>{" "}
+                          del monto total presupuestado.
+                        </li>
+
+                        <li>
+                          Los plazos de pago se darán según lo estipulado en las
+                          condiciones de pago que figuran en el cuadro superior de la
+                          presente Orden de Compra o Servicio.
+                        </li>
+                      </ol>
                     </div>
                   </SeccionDocumento>
                 </div>
