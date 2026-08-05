@@ -3,7 +3,7 @@
 import Link from "next/link";
 import {
   useEffect,
-  useMemo,
+  Suspense,
   useRef,
   useState,
 } from "react";
@@ -166,7 +166,7 @@ const formInicial: FormPago = {
   observaciones: "",
 };
 
-export default function RegistrarPagoPage() {
+function RegistrarPagoContent() {
   const searchParams =
     useSearchParams();
 
@@ -1785,6 +1785,25 @@ export default function RegistrarPagoPage() {
         )}
       </main>
     </MainLayout>
+  );
+}
+export default function RegistrarPagoPage() {
+  return (
+    <Suspense
+      fallback={
+        <MainLayout>
+          <main className="min-h-screen bg-[#F6F8FB] p-6 md:p-8">
+            <div className="mx-auto max-w-7xl">
+              <p className="text-sm text-slate-500">
+                Cargando información del pago...
+              </p>
+            </div>
+          </main>
+        </MainLayout>
+      }
+    >
+      <RegistrarPagoContent />
+    </Suspense>
   );
 }
 
