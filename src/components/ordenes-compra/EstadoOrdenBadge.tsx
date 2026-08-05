@@ -6,6 +6,8 @@ function formatearEstado(estado: string) {
   if (estado === "borrador") return "Borrador";
   if (estado === "pendiente_aprobacion") return "Pendiente de aprobación";
   if (estado === "pendiente_factura") return "Pendiente de factura";
+  if (estado === "factura_parcial") return "Facturación parcial";
+  if (estado === "factura_completa") return "Completamente facturada";
   if (estado === "factura_recibida") return "Factura recibida";
   if (estado === "en_conformidad") return "En conformidad";
   if (estado === "aprobada") return "Aprobada";
@@ -23,6 +25,13 @@ function estadoClass(estado: string) {
 
   if (estado === "finalizada") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (estado === "factura_completa") {
+    return "border-green-200 bg-green-50 text-green-700";
+  }
+
+  if (estado === "factura_parcial") {
+    return "border-orange-200 bg-orange-50 text-orange-700";
   }
 
   if (estado === "factura_recibida") {

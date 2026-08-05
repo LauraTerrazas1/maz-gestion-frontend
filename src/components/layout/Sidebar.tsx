@@ -56,22 +56,6 @@ const navItems = [
     ),
   },
   {
-    href: "/pagos",
-    label: "Pagos",
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-        <path
-          d="M4 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7Zm0 0V6a2 2 0 0 1 2-2h12M16 14h3"
-          fill="none"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.8"
-        />
-      </svg>
-    ),
-  },
-  {
     href: "/alertas",
     label: "Alertas",
     icon: (
@@ -107,6 +91,18 @@ export default function Sidebar({
     pathname.startsWith("/facturas");
   pathname.startsWith("/conformidades");
 
+  const pagosActivo =
+    pathname.startsWith("/programaciones-pago") ||
+    pathname.startsWith("/pagos");
+
+  const [pagosAbierto, setPagosAbierto] =
+    useState(pagosActivo);
+
+  useEffect(() => {
+    if (pagosActivo) {
+      setPagosAbierto(true);
+    }
+  }, [pagosActivo]);
   const [comprasAbierto, setComprasAbierto] = useState(comprasActivo);
 
   useEffect(() => {
@@ -232,8 +228,8 @@ export default function Sidebar({
                   href="/ordenes-compra"
                   title="Órdenes de Compra"
                   className={`group flex items-center justify-center rounded-xl px-2 py-3 text-sm font-semibold transition-all ${comprasActivo
-                      ? "border border-[#9DFF3A]/40 bg-gradient-to-r from-[#1f7a2e]/80 to-[#163b24]/80 text-white shadow-[0_8px_30px_rgba(45,200,80,0.12)]"
-                      : "text-white/90 hover:bg-[#153a26]/30"
+                    ? "border border-[#9DFF3A]/40 bg-gradient-to-r from-[#1f7a2e]/80 to-[#163b24]/80 text-white shadow-[0_8px_30px_rgba(45,200,80,0.12)]"
+                    : "text-white/90 hover:bg-[#153a26]/30"
                     }`}
                 >
                   <span className="text-[#9DFF3A]">
@@ -248,8 +244,8 @@ export default function Sidebar({
                       setComprasAbierto((actual) => !actual)
                     }
                     className={`group flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${comprasActivo
-                        ? "border border-[#9DFF3A]/40 bg-gradient-to-r from-[#1f7a2e]/80 to-[#163b24]/80 text-white shadow-[0_8px_30px_rgba(45,200,80,0.12)]"
-                        : "text-white/90 hover:bg-[#153a26]/30"
+                      ? "border border-[#9DFF3A]/40 bg-gradient-to-r from-[#1f7a2e]/80 to-[#163b24]/80 text-white shadow-[0_8px_30px_rgba(45,200,80,0.12)]"
+                      : "text-white/90 hover:bg-[#153a26]/30"
                       }`}
                   >
                     <span className="flex-none text-[#9DFF3A]">
@@ -301,7 +297,102 @@ export default function Sidebar({
                 </>
               )}
             </div>
+            <div>
+              {isCollapsed ? (
+                <Link
+                  href="/programaciones-pago"
+                  title="Gestión de Pagos"
+                  className={`group flex items-center justify-center rounded-xl px-2 py-3 text-sm font-semibold transition-all ${pagosActivo
+                      ? "border border-[#9DFF3A]/40 bg-gradient-to-r from-[#1f7a2e]/80 to-[#163b24]/80 text-white"
+                      : "text-white/90 hover:bg-[#153a26]/30"
+                    }`}
+                >
+                  <span className="text-[#9DFF3A]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-5 w-5"
+                    >
+                      <path
+                        d="M4 7h16v10H4zM15 12h4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </Link>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPagosAbierto((v) => !v)
+                    }
+                    className={`group flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${pagosActivo
+                        ? "border border-[#9DFF3A]/40 bg-gradient-to-r from-[#1f7a2e]/80 to-[#163b24]/80 text-white"
+                        : "text-white/90 hover:bg-[#153a26]/30"
+                      }`}
+                  >
+                    <span className="text-[#9DFF3A]">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-5 w-5"
+                      >
+                        <path
+                          d="M4 7h16v10H4zM15 12h4"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
 
+                    <span className="flex-1 text-left">
+                      Gestión de Pagos
+                    </span>
+
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={`h-4 w-4 transition-transform ${pagosAbierto ? "rotate-180" : ""
+                        }`}
+                    >
+                      <path
+                        d="m6 9 6 6 6-6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                    </svg>
+                  </button>
+
+                  {pagosAbierto && (
+                    <div className="ml-6 mt-2 space-y-1 border-l border-white/15 pl-4">
+
+                      <SubmenuLink
+                        href="/programaciones-pago"
+                        label="Programación de pagos"
+                        activo={pathname.startsWith(
+                          "/programaciones-pago"
+                        )}
+                      />
+
+                      <SubmenuLink
+                        href="/pagos"
+                        label="Pagos realizados"
+                        activo={pathname.startsWith(
+                          "/pagos"
+                        )}
+                      />
+
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
             {navItems.slice(3).map((item) => {
               const activo =
                 pathname === item.href ||
@@ -369,8 +460,8 @@ function SidebarLink({
       href={item.href}
       title={isCollapsed ? item.label : undefined}
       className={`group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${activo
-          ? "border border-[#9DFF3A]/40 bg-gradient-to-r from-[#1f7a2e]/80 to-[#163b24]/80 text-white shadow-[0_8px_30px_rgba(45,200,80,0.12)]"
-          : "text-white/90 hover:bg-[#153a26]/30"
+        ? "border border-[#9DFF3A]/40 bg-gradient-to-r from-[#1f7a2e]/80 to-[#163b24]/80 text-white shadow-[0_8px_30px_rgba(45,200,80,0.12)]"
+        : "text-white/90 hover:bg-[#153a26]/30"
         } ${isCollapsed ? "justify-center px-2" : "justify-start"}`}
     >
       <span className="flex-none text-[#9DFF3A]">
@@ -406,8 +497,8 @@ function SubmenuLink({
     <Link
       href={href}
       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${activo
-          ? "bg-[#9DFF3A]/10 text-[#9DFF3A]"
-          : "text-slate-300 hover:bg-white/5 hover:text-white"
+        ? "bg-[#9DFF3A]/10 text-[#9DFF3A]"
+        : "text-slate-300 hover:bg-white/5 hover:text-white"
         }`}
     >
       <span

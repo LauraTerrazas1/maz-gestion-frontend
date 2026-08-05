@@ -37,12 +37,21 @@ export default function HistorialAlertasPage() {
 
   function formatearTipo(tipo: string) {
     if (tipo === "pago_proximo") return "Pago próximo";
+    if (tipo === "pago_hoy") return "Pago de hoy";
     if (tipo === "pago_vencido") return "Pago vencido";
     if (tipo === "comprobante_pendiente") return "Comprobante pendiente";
     if (tipo === "personal_eventual_pendiente") return "Personal eventual pendiente";
     if (tipo === "resumen_semanal") return "Resumen semanal";
     return tipo;
   }
+
+  function formatearOrigen(origen?: string | null) {
+  if (origen === "factura") return "Factura";
+  if (origen === "proveedor") return "Proveedor";
+  if (origen === "personal_eventual") return "Personal eventual";
+
+  return origen || "No registrado";
+}
 
   function formatearEstado(estado: string) {
     if (estado === "pagado_sin_comprobante") return "Pagado sin comprobante";
@@ -125,7 +134,7 @@ export default function HistorialAlertasPage() {
                       </td>
 
                       <td className="px-6 py-4 text-slate-600">
-                        {alerta.origen || "No registrado"}
+                        {formatearOrigen(alerta.origen)}
                       </td>
 
                       <td className="px-6 py-4">

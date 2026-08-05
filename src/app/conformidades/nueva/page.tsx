@@ -105,6 +105,7 @@ export default function NuevaConformidadPage() {
 
     const router = useRouter();
     const [guardando, setGuardando] = useState(false);
+    const [errorObservaciones, setErrorObservaciones] = useState("");
 
     const [estado, setEstado] = useState<
         "aprobada" | "observada"
@@ -222,10 +223,17 @@ export default function NuevaConformidadPage() {
         setErrorRevisadoPor("");
 
 
-        if (estado === "observada" && !observaciones.trim()) {
-            alert("Ingrese las observaciones de la factura.");
+        if (
+            estado === "observada" &&
+            !observaciones.trim()
+        ) {
+            setErrorObservaciones(
+                "Debes indicar por qué la factura fue observada."
+            );
             return;
         }
+
+        setErrorObservaciones("");
 
         try {
             setGuardando(true);
@@ -936,8 +944,8 @@ export default function NuevaConformidadPage() {
                                             }
                                         }}
                                         className={`w-full rounded-xl border px-4 py-3 outline-none transition ${errorRevisadoPor
-                                                ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
-                                                : "border-slate-200 focus:border-[#2F73D9] focus:ring-2 focus:ring-blue-100"
+                                            ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                            : "border-slate-200 focus:border-[#2F73D9] focus:ring-2 focus:ring-blue-100"
                                             }`}
                                         placeholder="Nombre del responsable"
                                     />
@@ -988,12 +996,25 @@ export default function NuevaConformidadPage() {
                                     <textarea
                                         rows={5}
                                         value={observaciones}
-                                        onChange={(e) =>
-                                            setObservaciones(e.target.value)
-                                        }
+                                        onChange={(e) => {
+                                            setObservaciones(e.target.value);
+
+                                            if (e.target.value.trim()) {
+                                                setErrorObservaciones("");
+                                            }
+                                        }}
                                         placeholder="Comentarios, observaciones o incidencias..."
-                                        className="w-full rounded-xl border border-slate-200 px-4 py-3"
+                                        className={`w-full rounded-xl border px-4 py-3 ${errorObservaciones
+                                                ? "border-red-400"
+                                                : "border-slate-200"
+                                            }`}
                                     />
+
+                                    {errorObservaciones && (
+                                        <p className="mt-1.5 text-xs font-medium text-red-600">
+                                            {errorObservaciones}
+                                        </p>
+                                    )}
 
                                 </div>
 

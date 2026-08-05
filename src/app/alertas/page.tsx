@@ -101,7 +101,9 @@ export default function AlertasPage() {
     if (alerta.tipo_alerta === "pago_vencido") {
       return "Vencido";
     }
-
+    if (alerta.tipo_alerta === "pago_hoy") {
+      return "Vence hoy";
+    }
     if (alerta.tipo_alerta === "pago_proximo") {
       return "Programado";
     }
@@ -225,6 +227,11 @@ export default function AlertasPage() {
         <section className="mt-6 flex flex-wrap gap-3">
           <FiltroButton label="Todas" activo={filtro === "todas"} onClick={() => setFiltro("todas")} />
           <FiltroButton label="Pagos próximos" activo={filtro === "pago_proximo"} onClick={() => setFiltro("pago_proximo")} />
+          <FiltroButton
+            label="Pagos de hoy"
+            activo={filtro === "pago_hoy"}
+            onClick={() => setFiltro("pago_hoy")}
+          />
           <FiltroButton label="Pagos vencidos" activo={filtro === "pago_vencido"} onClick={() => setFiltro("pago_vencido")} />
           <FiltroButton label="Comprobantes" activo={filtro === "comprobante_pendiente"} onClick={() => setFiltro("comprobante_pendiente")} />
           <FiltroButton label="Personal eventual" activo={filtro === "personal_eventual"} onClick={() => setFiltro("personal_eventual")} />
@@ -319,20 +326,27 @@ export default function AlertasPage() {
                       </td>
 
                       <td className="px-6 py-4 text-right">
-                        <div className="flex flex-col items-end gap-1.5">
+                        <div className="flex flex-col items-end gap-2">
                           <button
                             onClick={() => setAlertaSeleccionada(alerta)}
-                            className="text-sm font-semibold text-[#2F73D9] hover:text-[#245DB3]"
+                            className="text-xs font-medium text-slate-500 hover:text-slate-700"
                           >
                             Ver detalle
                           </button>
 
-                          {alerta.id.startsWith("calc-") ? (
+                          {alerta.tipo_alerta === "comprobante_pendiente" ? (
                             <Link
-                              href={`/pagos`}
-                              className="text-xs font-semibold text-slate-500 hover:text-[#2F73D9]"
+                              href="/pagos"
+                              className="rounded-lg bg-[#2F73D9] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#245DB3]"
                             >
                               Subir comprobante
+                            </Link>
+                          ) : alerta.programacion_pago_id ? (
+                            <Link
+                              href={`/pagos/registrar?programacion_pago_id=${alerta.programacion_pago_id}`}
+                              className="rounded-lg bg-[#2F73D9] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#245DB3]"
+                            >
+                              Registrar pago
                             </Link>
                           ) : (
                             <button
@@ -406,7 +420,7 @@ export default function AlertasPage() {
                   Cerrar
                 </button>
 
-                {alertaSeleccionada.id.startsWith("calc-") ? (
+                {alertaSeleccionada.tipo_alerta === "comprobante_pendiente" ? (
                   <Link
                     href="/pagos"
                     className="rounded-lg bg-[#2F73D9] px-5 py-2.5 text-sm font-semibold text-white"
