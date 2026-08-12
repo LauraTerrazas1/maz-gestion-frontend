@@ -61,6 +61,27 @@ export default function NuevaFacturaPage() {
 
     const [archivoPdf, setArchivoPdf] = useState<File | null>(null);
     const [archivoXml, setArchivoXml] = useState<File | null>(null);
+    const [facturaCreadaId, setFacturaCreadaId] =
+        useState<string | null>(null);
+
+    const [mostrarRevision, setMostrarRevision] =
+        useState(false);
+
+    const [datosFactura, setDatosFactura] = useState({
+        serie: "",
+        numero: "",
+        fecha_emision: "",
+        subtotal: "",
+        igv: "",
+        total: "",
+        moneda: "PEN",
+
+        tiene_detraccion: false,
+        codigo_detraccion: "",
+        porcentaje_detraccion: "",
+        monto_detraccion: "",
+        cuenta_detraccion_detectada: "",
+    });
     const [subiendoArchivos, setSubiendoArchivos] = useState(false);
 
     const [error, setError] = useState("");
@@ -158,32 +179,48 @@ export default function NuevaFacturaPage() {
         if (!ordenSeleccionada) return;
 
         if (!archivoPdf && !archivoXml) {
-            alert("Debes seleccionar al menos un archivo PDF o XML.");
+            alert(
+                "Debes seleccionar al menos un archivo PDF o XML."
+            );
             return;
         }
 
         try {
             setGuardando(true);
             setSubiendoArchivos(false);
+            setError("");
 
+            // 1. Crear registro inicial
             const factura = await apiFetch("/facturas/", {
                 method: "POST",
                 body: JSON.stringify({
-                    orden_compra_id: ordenSeleccionada.id,
-                    tipo_comprobante: tipoComprobante,
-                    fecha_recepcion: fechaRecepcion,
-                    observaciones: observaciones.trim() || null,
+                    orden_compra_id:
+                        ordenSeleccionada.id,
+
+                    tipo_comprobante:
+                        tipoComprobante,
+
+                    fecha_recepcion:
+                        fechaRecepcion,
+
+                    observaciones:
+                        observaciones.trim() || null,
                 }),
             });
 
             if (!factura?.id) {
-                throw new Error("No se recibió el ID de la factura.");
+                throw new Error(
+                    "No se recibió el ID de la factura."
+                );
             }
 
+            setFacturaCreadaId(factura.id);
             setSubiendoArchivos(true);
 
+            // 2. Subir PDF
             if (archivoPdf) {
-                const formDataPdf = new FormData();
+                const formDataPdf =
+                    new FormData();
 
                 formDataPdf.append(
                     "archivo_pdf",
@@ -199,8 +236,10 @@ export default function NuevaFacturaPage() {
                 );
             }
 
+            // 3. Subir XML
             if (archivoXml) {
-                const formDataXml = new FormData();
+                const formDataXml =
+                    new FormData();
 
                 formDataXml.append(
                     "archivo_xml",
@@ -216,7 +255,88 @@ export default function NuevaFacturaPage() {
                 );
             }
 
-            router.push(`/facturas/${factura.id}`);
+            // 4. Volver a consultar la factura
+            // ya con todos los datos detectados
+            const facturaActualizada =
+                await apiFetch(
+                    `/facturas/${factura.id}`
+                );
+
+            // 5. Cargar datos detectados al formulario editable
+            setDatosFactura({
+                serie:
+                    facturaActualizada?.serie ?? "",
+
+                numero:
+                    facturaActualizada?.numero ?? "",
+
+                fecha_emision:
+                    facturaActualizada?.fecha_emision ?? "",
+
+                subtotal:
+                    facturaActualizada?.subtotal != null
+                        ? String(
+                            facturaActualizada.subtotal
+                        )
+                        : "",
+
+                igv:
+                    facturaActualizada?.igv != null
+                        ? String(
+                            facturaActualizada.igv
+                        )
+                        : "",
+
+                total:
+                    facturaActualizada?.total != null
+                        ? String(
+                            facturaActualizada.total
+                        )
+                        : "",
+
+                moneda:
+                    facturaActualizada?.moneda ||
+                    ordenSeleccionada.moneda ||
+                    "PEN",
+
+                tiene_detraccion:
+                    Boolean(
+                        facturaActualizada?.tiene_detraccion
+                    ) ||
+                    facturaActualizada?.estado_detraccion ===
+                    "detectada",
+
+                codigo_detraccion:
+                    facturaActualizada?.codigo_detraccion ??
+                    "",
+
+                porcentaje_detraccion:
+                    facturaActualizada?.porcentaje_detraccion !=
+                        null
+                        ? String(
+                            facturaActualizada
+                                .porcentaje_detraccion
+                        )
+                        : "",
+
+                monto_detraccion:
+                    facturaActualizada?.monto_detraccion !=
+                        null
+                        ? String(
+                            facturaActualizada
+                                .monto_detraccion
+                        )
+                        : "",
+
+                cuenta_detraccion_detectada:
+                    facturaActualizada
+                        ?.cuenta_detraccion_detectada ??
+                    "",
+            });
+
+            // YA NO mandamos al detalle todavía
+            setMostrarRevision(true);
+
         } catch (error) {
             console.error(error);
 
@@ -230,6 +350,153 @@ export default function NuevaFacturaPage() {
             setSubiendoArchivos(false);
         }
     }
+    async function guardarRevisionFactura() {
+        if (!facturaCreadaId) {
+            return;
+        }
+
+        if (
+            !datosFactura.serie.trim() ||
+            !datosFactura.numero.trim() ||
+            !datosFactura.fecha_emision ||
+            !datosFactura.total
+        ) {
+            alert(
+                "Completa como mínimo serie, número, fecha de emisión y total."
+            );
+            return;
+        }
+
+        const total = Number(
+            datosFactura.total
+        );
+
+        const subtotal = Number(
+            datosFactura.subtotal || 0
+        );
+
+        const igv = Number(
+            datosFactura.igv || 0
+        );
+
+        if (
+            Number.isNaN(total) ||
+            total <= 0
+        ) {
+            alert(
+                "Ingresa un total válido."
+            );
+            return;
+        }
+
+        try {
+            setGuardando(true);
+
+            await apiFetch(
+                `/facturas/${facturaCreadaId}`,
+                {
+                    method: "PUT",
+
+                    body: JSON.stringify({
+                        serie:
+                            datosFactura.serie.trim(),
+
+                        numero:
+                            datosFactura.numero.trim(),
+
+                        fecha_emision:
+                            datosFactura.fecha_emision,
+
+                        fecha_recepcion:
+                            fechaRecepcion,
+
+                        subtotal,
+                        igv,
+                        total,
+
+                        moneda:
+                            datosFactura.moneda,
+
+                        observaciones:
+                            observaciones.trim() ||
+                            null,
+
+                        tiene_detraccion:
+                            datosFactura.tiene_detraccion,
+
+                        estado_detraccion:
+                            datosFactura.tiene_detraccion
+                                ? "detectada"
+                                : "no_aplica",
+
+                        codigo_detraccion:
+                            datosFactura.tiene_detraccion
+                                ? datosFactura
+                                    .codigo_detraccion
+                                    .trim() || null
+                                : null,
+
+                        porcentaje_detraccion:
+                            datosFactura.tiene_detraccion &&
+                                datosFactura
+                                    .porcentaje_detraccion
+                                ? Number(
+                                    datosFactura
+                                        .porcentaje_detraccion
+                                )
+                                : 0,
+
+                        monto_detraccion:
+                            datosFactura.tiene_detraccion &&
+                                datosFactura
+                                    .monto_detraccion
+                                ? Number(
+                                    datosFactura
+                                        .monto_detraccion
+                                )
+                                : 0,
+
+                        cuenta_detraccion_detectada:
+                            datosFactura.tiene_detraccion
+                                ? datosFactura
+                                    .cuenta_detraccion_detectada
+                                    .trim() || null
+                                : null,
+                    }),
+                }
+            );
+
+            router.push(
+                `/facturas/${facturaCreadaId}`
+            );
+
+        } catch (error) {
+            console.error(
+                "Error guardando revisión:",
+                error
+            );
+
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "No se pudo guardar la revisión."
+            );
+        } finally {
+            setGuardando(false);
+        }
+    }
+    function verArchivo(archivo: File | null) {
+        if (!archivo) return;
+
+        const url = URL.createObjectURL(archivo);
+        window.open(url, "_blank", "noopener,noreferrer");
+
+        setTimeout(() => {
+            URL.revokeObjectURL(url);
+        }, 60000);
+    }
+
+
     return (
         <MainLayout>
             <main className="min-h-screen bg-[#F6F8FB] p-8">
@@ -774,34 +1041,334 @@ export default function NuevaFacturaPage() {
                                 Cancelar
                             </button>
 
-                            <button
-                                type="button"
-                                disabled={
-                                    guardando ||
-                                    (!archivoPdf && !archivoXml)
-                                }
-                                onClick={crearFactura}
-                                className="
-                                    rounded-xl bg-[#2F73D9] px-6 py-3
-                                    text-sm font-semibold text-white
-                                    transition hover:bg-[#245DB3]
-                                    disabled:cursor-not-allowed
-                                    disabled:opacity-50
-                                "
-                            >
-                                {guardando
-                                    ? subiendoArchivos
-                                        ? "Subiendo documento..."
-                                        : "Creando factura..."
-                                    : "Crear factura"}
-                            </button>
-                            {!archivoPdf && !archivoXml && (
+                            {!mostrarRevision && (
+                                <button
+                                    type="button"
+                                    disabled={
+                                        guardando ||
+                                        (!archivoPdf && !archivoXml)
+                                    }
+                                    onClick={crearFactura}
+                                    className="
+                                        rounded-xl bg-[#2F73D9] px-6 py-3
+                                        text-sm font-semibold text-white
+                                        transition hover:bg-[#245DB3]
+                                        disabled:cursor-not-allowed
+                                        disabled:opacity-50
+                                    "
+                                >
+                                    {guardando
+                                        ? subiendoArchivos
+                                            ? "Analizando documento..."
+                                            : "Creando factura..."
+                                        : "Analizar factura"}
+                                </button>
+                            )}
+                            {!mostrarRevision && !archivoPdf && !archivoXml && (
                                 <p className="mt-2 text-right text-xs text-slate-500">
                                     Adjunta al menos el PDF o el XML de la factura.
                                 </p>
                             )}
 
                         </div>
+                        {mostrarRevision && (
+                            <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6">
+                                <div className="mb-6">
+                                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
+                                        Revisión manual
+                                    </p>
+
+                                    <h3 className="mt-2 text-xl font-bold text-[#102033]">
+                                        Datos detectados de la factura
+                                    </h3>
+
+                                    <p className="mt-1 text-sm text-slate-600">
+                                        Revisa los datos extraídos del documento. Si algún campo no fue detectado o es incorrecto, puedes completarlo manualmente antes de continuar.
+                                    </p>
+                                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                                        <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Documentos:
+                                        </span>
+
+                                        {archivoPdf && (
+                                            <button
+                                                type="button"
+                                                onClick={() => verArchivo(archivoPdf)}
+                                                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-[#2F73D9] transition hover:bg-slate-50"
+                                            >
+                                                Ver PDF
+                                            </button>
+                                        )}
+
+                                        {archivoXml && (
+                                            <button
+                                                type="button"
+                                                onClick={() => verArchivo(archivoXml)}
+                                                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-[#2F73D9] transition hover:bg-slate-50"
+                                            >
+                                                Ver XML
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-4">
+                                    <div>
+                                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Serie *
+                                        </label>
+
+                                        <input
+                                            value={datosFactura.serie}
+                                            onChange={(e) =>
+                                                setDatosFactura((prev) => ({
+                                                    ...prev,
+                                                    serie: e.target.value,
+                                                }))
+                                            }
+                                            placeholder="Ej. F001"
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Número *
+                                        </label>
+
+                                        <input
+                                            value={datosFactura.numero}
+                                            onChange={(e) =>
+                                                setDatosFactura((prev) => ({
+                                                    ...prev,
+                                                    numero: e.target.value,
+                                                }))
+                                            }
+                                            placeholder="Ej. 00000125"
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Fecha de emisión *
+                                        </label>
+
+                                        <input
+                                            type="date"
+                                            value={datosFactura.fecha_emision}
+                                            onChange={(e) =>
+                                                setDatosFactura((prev) => ({
+                                                    ...prev,
+                                                    fecha_emision: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Moneda
+                                        </label>
+
+                                        <select
+                                            value={datosFactura.moneda}
+                                            onChange={(e) =>
+                                                setDatosFactura((prev) => ({
+                                                    ...prev,
+                                                    moneda: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                        >
+                                            <option value="PEN">Soles (PEN)</option>
+                                            <option value="USD">Dólares (USD)</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Subtotal
+                                        </label>
+
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={datosFactura.subtotal}
+                                            onChange={(e) =>
+                                                setDatosFactura((prev) => ({
+                                                    ...prev,
+                                                    subtotal: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            IGV
+                                        </label>
+
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={datosFactura.igv}
+                                            onChange={(e) =>
+                                                setDatosFactura((prev) => ({
+                                                    ...prev,
+                                                    igv: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Total *
+                                        </label>
+
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={datosFactura.total}
+                                            onChange={(e) =>
+                                                setDatosFactura((prev) => ({
+                                                    ...prev,
+                                                    total: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+                                    <label className="flex cursor-pointer items-center gap-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={datosFactura.tiene_detraccion}
+                                            onChange={(e) =>
+                                                setDatosFactura((prev) => ({
+                                                    ...prev,
+                                                    tiene_detraccion: e.target.checked,
+                                                }))
+                                            }
+                                            className="h-4 w-4"
+                                        />
+
+                                        <div>
+                                            <p className="font-semibold text-[#102033]">
+                                                La factura tiene detracción
+                                            </p>
+
+                                            <p className="text-xs text-slate-500">
+                                                Activa esta opción si corresponde aplicar detracción.
+                                            </p>
+                                        </div>
+                                    </label>
+
+                                    {datosFactura.tiene_detraccion && (
+                                        <div className="mt-4 grid gap-4 md:grid-cols-4">
+                                            <div>
+                                                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    Código de detracción
+                                                </label>
+
+                                                <input
+                                                    value={datosFactura.codigo_detraccion}
+                                                    onChange={(e) =>
+                                                        setDatosFactura((prev) => ({
+                                                            ...prev,
+                                                            codigo_detraccion: e.target.value,
+                                                        }))
+                                                    }
+                                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    Porcentaje de detracción
+                                                </label>
+
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={datosFactura.porcentaje_detraccion}
+                                                    onChange={(e) =>
+                                                        setDatosFactura((prev) => ({
+                                                            ...prev,
+                                                            porcentaje_detraccion: e.target.value,
+                                                        }))
+                                                    }
+                                                    placeholder="Ej. 12"
+                                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    Monto de detracción
+                                                </label>
+
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={datosFactura.monto_detraccion}
+                                                    onChange={(e) =>
+                                                        setDatosFactura((prev) => ({
+                                                            ...prev,
+                                                            monto_detraccion: e.target.value,
+                                                        }))
+                                                    }
+                                                    placeholder="Ej. 1000"
+                                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    Cuenta Banco de la Nación
+                                                </label>
+
+                                                <input
+                                                    value={datosFactura.cuenta_detraccion_detectada}
+                                                    onChange={(e) =>
+                                                        setDatosFactura((prev) => ({
+                                                            ...prev,
+                                                            cuenta_detraccion_detectada: e.target.value,
+                                                        }))
+                                                    }
+                                                    placeholder="Ej. 123456789"
+                                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-6 flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={guardarRevisionFactura}
+                                        disabled={guardando}
+                                        className="rounded-lg bg-[#2F73D9] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#245DB3] disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {guardando
+                                            ? "Guardando..."
+                                            : "Guardar y continuar"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </section>
                 )}
             </main>

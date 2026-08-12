@@ -90,6 +90,7 @@ function textoDetraccion(estado: string | null) {
 
 export default function FacturasPage() {
     const [facturas, setFacturas] = useState<Factura[]>([]);
+    const [facturasPendientes, setFacturasPendientes] = useState(0);
 
     const [buscar, setBuscar] = useState("");
     const [estadoFiltro, setEstadoFiltro] = useState("");
@@ -103,7 +104,16 @@ export default function FacturasPage() {
             setCargando(true);
             setError("");
 
-            const data = await apiFetch("/facturas/");
+            const [data, pendientesData] = await Promise.all([
+                apiFetch("/facturas/"),
+                apiFetch("/ordenes-compra/disponibles-facturacion"),
+            ]);
+
+            setFacturas(Array.isArray(data) ? data : []);
+
+            setFacturasPendientes(
+                Array.isArray(pendientesData) ? pendientesData.length : 0
+            );
 
             setFacturas(
                 Array.isArray(data)
@@ -204,7 +214,19 @@ export default function FacturasPage() {
                         </button>
                     </div>
                 </div>
+                <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                    <p className="text-sm font-medium text-amber-700">
+                        Facturas pendientes de subir
+                    </p>
 
+                    <p className="mt-2 text-3xl font-bold text-amber-700">
+                        {facturasPendientes}
+                    </p>
+
+                    <p className="mt-1 text-xs text-amber-700/70">
+                        Órdenes de compra con facturación pendiente
+                    </p>
+                </div>
                 <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <div className="xl:col-span-2">

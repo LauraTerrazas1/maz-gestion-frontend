@@ -1964,12 +1964,13 @@ export default function NuevaProgramacionPagoPage() {
 
                                             <InfoItem
                                                 label="Porcentaje"
-                                                value={`${Number(
-                                                    facturaSeleccionada.porcentaje_detraccion ??
-                                                    0
-                                                ).toFixed(
-                                                    2
-                                                )}%`}
+                                                value={
+                                                    facturaSeleccionada.porcentaje_detraccion != null
+                                                        ? `${Number(
+                                                            facturaSeleccionada.porcentaje_detraccion
+                                                        ).toFixed(2)}%`
+                                                        : "No registrado"
+                                                }
                                             />
 
                                             <InfoItem

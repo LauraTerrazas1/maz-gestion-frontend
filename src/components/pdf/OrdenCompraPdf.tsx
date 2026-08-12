@@ -364,8 +364,14 @@ function dinero(
   valor: number | string | null | undefined,
   moneda: string
 ) {
-  const numero = Number(valor || 0).toFixed(2);
-  return moneda === "USD" ? `US$ ${numero}` : `S/ ${numero}`;
+  const numero = Number(valor || 0).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  return moneda === "USD"
+    ? `US$ ${numero}`
+    : `S/ ${numero}`;
 }
 
 function DataRow({

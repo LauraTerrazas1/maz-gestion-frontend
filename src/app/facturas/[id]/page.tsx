@@ -34,6 +34,8 @@ type Factura = {
     archivo_pdf_nombre: string | null;
     archivo_xml_url: string | null;
     archivo_xml_nombre: string | null;
+    archivo_pdf_url_firmada?: string | null;
+    archivo_xml_url_firmada?: string | null;
 
     monto_oc: number | string | null;
     diferencia_oc: number | string | null;
@@ -307,7 +309,7 @@ export default function DetalleFacturaPage() {
     );
 
     const cuentaDetracciones =
-        factura.cuenta_detraccion_detectada  ||
+        factura.cuenta_detraccion_detectada ||
         "Cuenta no registrada";
     return (
         <MainLayout>
@@ -688,11 +690,13 @@ export default function DetalleFacturaPage() {
                                 <DocumentoAdjunto
                                     tipo="PDF"
                                     nombre={factura.archivo_pdf_nombre}
+                                    url={factura.archivo_pdf_url_firmada}
                                 />
 
                                 <DocumentoAdjunto
                                     tipo="XML"
                                     nombre={factura.archivo_xml_nombre}
+                                    url={factura.archivo_xml_url_firmada}
                                 />
                             </div>
                         </section>
@@ -789,18 +793,20 @@ function ResumenPago({
         </div>
     );
 }
-
 function DocumentoAdjunto({
     tipo,
     nombre,
+    url,
 }: {
     tipo: "PDF" | "XML";
     nombre: string | null;
+    url?: string | null;
 }) {
     const existe = Boolean(nombre);
+    const sePuedeAbrir = Boolean(nombre && url);
 
-    return (
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-4">
+    const contenido = (
+        <>
             <div
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${tipo === "PDF"
                     ? "bg-red-100 text-red-600"
@@ -827,9 +833,34 @@ function DocumentoAdjunto({
                 </p>
             </div>
 
-            {existe && (
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+            {sePuedeAbrir ? (
+                <span className="shrink-0 text-xs font-semibold text-[#2F73D9]">
+                    Ver
+                </span>
+            ) : (
+                existe && (
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+                )
             )}
+        </>
+    );
+
+    if (sePuedeAbrir) {
+        return (
+            <a
+                href={url!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 transition hover:border-[#2F73D9] hover:bg-blue-50/40"
+            >
+                {contenido}
+            </a>
+        );
+    }
+
+    return (
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-4">
+            {contenido}
         </div>
     );
 }
@@ -850,8 +881,8 @@ function DatoComprobante({
 
             <p
                 className={`mt-2 font-semibold ${destacado
-                        ? "text-[#2F73D9]"
-                        : "text-[#102033]"
+                    ? "text-[#2F73D9]"
+                    : "text-[#102033]"
                     }`}
             >
                 {valor}
@@ -872,8 +903,8 @@ function MontoComprobante({
     return (
         <div
             className={`rounded-xl border p-4 ${destacado
-                    ? "border-slate-300 bg-slate-50"
-                    : "border-slate-200 bg-white"
+                ? "border-slate-300 bg-slate-50"
+                : "border-slate-200 bg-white"
                 }`}
         >
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -882,8 +913,8 @@ function MontoComprobante({
 
             <p
                 className={`mt-2 font-bold ${destacado
-                        ? "text-xl text-[#102033]"
-                        : "text-lg text-slate-700"
+                    ? "text-xl text-[#102033]"
+                    : "text-lg text-slate-700"
                     }`}
             >
                 {valor}

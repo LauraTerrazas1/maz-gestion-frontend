@@ -17,17 +17,51 @@ type Evento = {
 
 type ProgramacionPago = {
   id: string;
+  evento_id?: string | null;
+  factura_id?: string | null;
+  orden_compra_id?: string | null;
   evento_proveedor_id?: string | null;
+
   tipo_programacion: string;
+  tipo_destino?: string | null;
   fecha_programada: string;
   monto: number | string;
   porcentaje: number | string | null;
   estado: string;
+
+  eventos?: {
+    id?: string;
+    nombre?: string | null;
+    cliente?: string | null;
+  } | null;
+
   evento_proveedores?: {
     servicio?: string | null;
     proveedores?: {
       razon_social?: string | null;
     } | null;
+  } | null;
+
+  facturas?: {
+    serie?: string | null;
+    numero?: string | null;
+    cuenta_detraccion_detectada?: string | null;
+    ordenes_compra?: {
+      numero_oc?: string | null;
+      proveedores?: {
+        razon_social?: string | null;
+        documento?: string | null;
+      } | null;
+    } | null;
+  } | null;
+
+  proveedores_cuentas_bancarias?: {
+    banco?: string | null;
+    tipo_cuenta?: string | null;
+    moneda?: string | null;
+    numero_cuenta?: string | null;
+    cci?: string | null;
+    titular_cuenta?: string | null;
   } | null;
 };
 
@@ -91,11 +125,17 @@ export default function EventoProgramacionesPage() {
       try {
         const [eventoData, programacionesData] = await Promise.all([
           apiFetch(`/eventos/${params.id}`),
-          apiFetch(`/programaciones-pago/evento/${params.id}`),
+          apiFetch("/programaciones-pago/"),
         ]);
 
         setEvento(eventoData);
-        setProgramaciones(Array.isArray(programacionesData) ? programacionesData : []);
+        setProgramaciones(
+          Array.isArray(programacionesData)
+            ? programacionesData.filter(
+              (item: ProgramacionPago) => item.evento_id === params.id
+            )
+            : []
+        );
       } catch (fetchError) {
         console.error(fetchError);
         setError("No se pudo cargar las programaciones del evento.");
@@ -108,13 +148,97 @@ export default function EventoProgramacionesPage() {
   }, [params.id]);
 
   const programacionesFiltradas = programaciones.filter((item) => {
-    const textoProveedor = (item.evento_proveedores?.proveedores?.razon_social || "").toLowerCase();
+    const textoProveedor = (
+      item.facturas?.ordenes_compra?.proveedores?.razon_social ||
+      item.evento_proveedores?.proveedores?.razon_social ||
+      ""
+    ).toLowerCase();
     const coincideProveedor = !proveedorFiltro || textoProveedor.includes(proveedorFiltro.toLowerCase());
     const coincideEstado = estadoFiltro === "todos" || item.estado === estadoFiltro;
     const coincideFecha = !fechaFiltro || item.fecha_programada === fechaFiltro;
 
     return coincideProveedor && coincideEstado && coincideFecha;
   });
+
+  function descargarProgramaciones() {
+    if (programacionesFiltradas.length === 0) {
+      alert("No hay programaciones para descargar.");
+      return;
+    }
+
+    const encabezados = [
+      "Fecha programada",
+      "Evento",
+      "OC",
+      "Factura",
+      "Proveedor",
+      "RUC",
+      "Destino",
+      "Banco",
+      "Tipo de cuenta",
+      "Numero de cuenta",
+      "CCI",
+      "Titular",
+      "Monto",
+      "Estado",
+    ];
+
+    const filas = programacionesFiltradas.map((item) => {
+      const factura = item.facturas;
+      const orden = factura?.ordenes_compra;
+      const proveedorFactura = orden?.proveedores;
+      const cuenta = item.proveedores_cuentas_bancarias;
+
+      const proveedor =
+        proveedorFactura?.razon_social ||
+        item.evento_proveedores?.proveedores?.razon_social ||
+        "";
+
+      const esDetraccion = item.tipo_destino === "detraccion";
+
+      return [
+        item.fecha_programada || "",
+        evento?.nombre || "",
+        orden?.numero_oc || "",
+        factura
+          ? `${factura.serie || ""}-${factura.numero || ""}`
+          : "",
+        proveedor,
+        proveedorFactura?.documento || "",
+        esDetraccion ? "Detracción" : "Proveedor",
+        esDetraccion ? "Banco de la Nación" : cuenta?.banco || "",
+        esDetraccion ? "Detracciones" : cuenta?.tipo_cuenta || "",
+        esDetraccion
+          ? factura?.cuenta_detraccion_detectada || ""
+          : cuenta?.numero_cuenta || "",
+        esDetraccion ? "" : cuenta?.cci || "",
+        esDetraccion ? proveedor : cuenta?.titular_cuenta || "",
+        Number(item.monto || 0).toFixed(2),
+        formatearEstado(item.estado),
+      ];
+    });
+
+    const escapar = (valor: string | number) =>
+      `"${String(valor).replaceAll('"', '""')}"`;
+
+    const csv = [
+      encabezados.map(escapar).join(";"),
+      ...filas.map((fila) => fila.map(escapar).join(";")),
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `programaciones-${evento?.nombre || "evento"}.csv`;
+    link.click();
+
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <MainLayout>
@@ -131,6 +255,13 @@ export default function EventoProgramacionesPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={descargarProgramaciones}
+              className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              ↓ Descargar CSV
+            </button>
             <Link
               href={`/eventos/${params.id}`}
               className="inline-flex items-center justify-center rounded-lg bg-[#2F73D9] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#245DB3]"

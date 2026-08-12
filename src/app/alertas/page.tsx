@@ -29,6 +29,10 @@ type Alerta = {
   evento_nombre?: string | null;
   responsable?: string | null;
   concepto?: string | null;
+
+  orden_compra_id?: string | null;
+  numero_oc?: string | null;
+  saldo_sin_programar?: number | null;
 };
 
 export default function AlertasPage() {
@@ -80,6 +84,7 @@ export default function AlertasPage() {
     if (tipo === "personal_eventual_pendiente") return "Personal eventual pendiente";
     if (tipo === "resumen_semanal") return "Resumen semanal";
     if (tipo === "pago_hoy") return "Pago de hoy";
+    if (tipo === "saldo_sin_programar") return "Saldo sin programar";
     return tipo;
   }
 
@@ -88,6 +93,7 @@ export default function AlertasPage() {
     if (tipo === "comprobante_pendiente") return "bg-sky-50 text-sky-700 border-sky-200";
     if (tipo === "personal_eventual_pendiente") return "bg-purple-50 text-purple-700 border-purple-200";
     if (tipo === "pago_hoy") { return "border-purple-200 bg-purple-50 text-purple-700"; }
+    if (tipo === "saldo_sin_programar") { return "bg-amber-50 text-amber-700 border-amber-200"; }
     return "bg-amber-50 text-amber-700 border-amber-200";
   }
 
@@ -162,7 +168,20 @@ export default function AlertasPage() {
 
     return "border-blue-200 bg-blue-50 text-blue-700";
   }
+  function esOrdenCompra(alerta: Alerta) {
+    return (
+      alerta.origen === "orden_compra" ||
+      alerta.tipo_alerta === "saldo_sin_programar"
+    );
+  }
   function obtenerMonto(alerta: Alerta) {
+    if (
+      alerta.tipo_alerta === "saldo_sin_programar" &&
+      alerta.saldo_sin_programar !== null &&
+      alerta.saldo_sin_programar !== undefined
+    ) {
+      return alerta.saldo_sin_programar;
+    }
     if (alerta.monto !== null && alerta.monto !== undefined) {
       return alerta.monto;
     }
@@ -192,10 +211,9 @@ export default function AlertasPage() {
   const comprobantesPendientes = alertas.filter(
     (a) => a.tipo_alerta === "comprobante_pendiente"
   ).length;
-  const personalPendiente = alertas.filter(
-    (a) => a.origen === "personal_eventual"
+  const saldosSinProgramar = alertas.filter(
+    (a) => a.tipo_alerta === "saldo_sin_programar"
   ).length;
-
   return (
     <MainLayout>
       <main className="min-h-screen bg-[#F6F8FB] p-8">
@@ -221,7 +239,7 @@ export default function AlertasPage() {
           <ResumenCard titulo="Pagos vencidos" valor={pagosVencidos} />
           <ResumenCard titulo="Próximos pagos" valor={pagosProximos} />
           <ResumenCard titulo="Comprobantes pendientes" valor={comprobantesPendientes} />
-          <ResumenCard titulo="Personal eventual pendiente" valor={personalPendiente} />
+          <ResumenCard titulo="Saldos sin programar" valor={saldosSinProgramar} />
         </section>
 
         <section className="mt-6 flex flex-wrap gap-3">
@@ -233,6 +251,11 @@ export default function AlertasPage() {
             onClick={() => setFiltro("pago_hoy")}
           />
           <FiltroButton label="Pagos vencidos" activo={filtro === "pago_vencido"} onClick={() => setFiltro("pago_vencido")} />
+          <FiltroButton
+            label="Saldos sin programar"
+            activo={filtro === "saldo_sin_programar"}
+            onClick={() => setFiltro("saldo_sin_programar")}
+          />
           <FiltroButton label="Comprobantes" activo={filtro === "comprobante_pendiente"} onClick={() => setFiltro("comprobante_pendiente")} />
           <FiltroButton label="Personal eventual" activo={filtro === "personal_eventual"} onClick={() => setFiltro("personal_eventual")} />
         </section>
@@ -277,7 +300,11 @@ export default function AlertasPage() {
                               : "bg-blue-100 text-blue-700"
                               }`}
                           >
-                            {esPersonalEventual(alerta) ? "PE" : "P"}
+                            {esPersonalEventual(alerta)
+                              ? "PE"
+                              : esOrdenCompra(alerta)
+                                ? "OC"
+                                : "P"}
                           </div>
 
                           <div className="min-w-0 max-w-[150px]">
@@ -287,11 +314,17 @@ export default function AlertasPage() {
                                 : "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
                                 }`}
                             >
-                              {esPersonalEventual(alerta) ? "Personal" : "Proveedor"}
+                              {esPersonalEventual(alerta)
+                                ? "Personal"
+                                : esOrdenCompra(alerta)
+                                  ? "Orden de compra"
+                                  : "Proveedor"}
                             </div>
 
                             <p className="truncate text-sm font-semibold text-[#102033]">
-                              {obtenerDestinatario(alerta)}
+                              {esOrdenCompra(alerta)
+                                ? alerta.numero_oc || "OC no registrada"
+                                : obtenerDestinatario(alerta)}
                             </p>
 
                             <p className="truncate text-xs text-slate-500">
@@ -334,7 +367,14 @@ export default function AlertasPage() {
                             Ver detalle
                           </button>
 
-                          {alerta.tipo_alerta === "comprobante_pendiente" ? (
+                          {alerta.tipo_alerta === "saldo_sin_programar" ? (
+                            <Link
+                              href="/programaciones-pago/nuevo"
+                              className="rounded-lg bg-[#2F73D9] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#245DB3]"
+                            >
+                              Programar saldo
+                            </Link>
+                          ) : alerta.tipo_alerta === "comprobante_pendiente" ? (
                             <Link
                               href="/pagos"
                               className="rounded-lg bg-[#2F73D9] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#245DB3]"

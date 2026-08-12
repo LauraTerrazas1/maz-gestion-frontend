@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import MainLayout from "@/components/layout/MainLayout";
-import CustomSelect from "@/components/ui/CustomSelect";
 import Toast from "@/components/ui/Toast";
 import type { ToastTipo } from "@/components/ui/Toast";
 import { apiFetch } from "@/lib/api";
+import ListaCuentasBancarias, {
+  type CuentaBancaria,
+} from "@/components/proveedores/ListaCuentasBancarias";
 
 type ProveedorForm = {
   tipo_proveedor: string;
@@ -20,13 +22,7 @@ type ProveedorForm = {
   contacto_cargo: string;
   contacto_celular: string;
   contacto_correo: string;
-  banco: string;
-  tipo_cuenta: string;
-  numero_cuenta: string;
-  cci: string;
   cuenta_detracciones_bn: string;
-  moneda: string;
-  titular_cuenta: string;
   estado: string;
 };
 
@@ -41,13 +37,7 @@ const initialForm: ProveedorForm = {
   contacto_cargo: "",
   contacto_celular: "",
   contacto_correo: "",
-  banco: "",
-  tipo_cuenta: "",
-  numero_cuenta: "",
-  cci: "",
   cuenta_detracciones_bn: "",
-  moneda: "PEN",
-  titular_cuenta: "",
   estado: "activo",
 };
 
@@ -72,6 +62,13 @@ export default function EditarProveedorPage() {
   const router = useRouter();
 
   const [form, setForm] = useState<ProveedorForm>(initialForm);
+  const [cuentasBancarias, setCuentasBancarias] = useState<
+    CuentaBancaria[]
+  >([]);
+
+  const [cuentasOriginales, setCuentasOriginales] = useState<
+    CuentaBancaria[]
+  >([]);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [toast, setToast] = useState<{ tipo: ToastTipo; mensaje: string } | null>(null);
@@ -79,7 +76,10 @@ export default function EditarProveedorPage() {
   useEffect(() => {
     void Promise.resolve().then(async () => {
       try {
-        const data = await apiFetch(`/proveedores/${params.id}`);
+        const [data, cuentasData] = await Promise.all([
+          apiFetch(`/proveedores/${params.id}`),
+          apiFetch(`/proveedores-cuentas/proveedor/${params.id}`),
+        ]);
 
         setForm({
           tipo_proveedor: data.tipo_proveedor || "",
@@ -92,15 +92,15 @@ export default function EditarProveedorPage() {
           contacto_cargo: data.contacto_cargo || "",
           contacto_celular: data.contacto_celular || "",
           contacto_correo: data.contacto_correo || "",
-          banco: data.banco || "",
-          tipo_cuenta: data.tipo_cuenta || "",
-          numero_cuenta: data.numero_cuenta || "",
-          cci: data.cci || "",
           cuenta_detracciones_bn: data.cuenta_detracciones_bn || "",
-          moneda: data.moneda || "PEN",
-          titular_cuenta: data.titular_cuenta || "",
           estado: data.estado || "activo",
         });
+        const cuentas = Array.isArray(cuentasData)
+          ? cuentasData
+          : [];
+
+        setCuentasBancarias(cuentas);
+        setCuentasOriginales(cuentas);
       } catch (error) {
         console.error("Error al cargar proveedor:", error);
         setToast({ tipo: "error", mensaje: "No se pudo cargar el proveedor." });
@@ -121,6 +121,59 @@ export default function EditarProveedorPage() {
     return value.trim() === "" ? null : value.trim();
   }
 
+  async function guardarCuentasBancarias() {
+    const idsActuales = cuentasBancarias
+      .filter((cuenta) => cuenta.id)
+      .map((cuenta) => cuenta.id);
+
+    // Eliminar cuentas quitadas desde la interfaz
+    for (const cuentaOriginal of cuentasOriginales) {
+      if (
+        cuentaOriginal.id &&
+        !idsActuales.includes(cuentaOriginal.id)
+      ) {
+        await apiFetch(
+          `/proveedores-cuentas/${cuentaOriginal.id}`,
+          {
+            method: "DELETE",
+          }
+        );
+      }
+    }
+
+    // Crear o actualizar cuentas actuales
+    for (const cuenta of cuentasBancarias) {
+      const payload = {
+        banco: cuenta.banco,
+        tipo_cuenta: cuenta.tipo_cuenta,
+        moneda: cuenta.moneda || "PEN",
+        numero_cuenta: cuenta.numero_cuenta.trim(),
+        cci: cuenta.cci?.trim() || null,
+        titular_cuenta:
+          cuenta.titular_cuenta?.trim() || null,
+        es_principal: cuenta.es_principal,
+        estado: "activo",
+      };
+
+      if (cuenta.id) {
+        await apiFetch(
+          `/proveedores-cuentas/${cuenta.id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          }
+        );
+      } else {
+        await apiFetch(
+          `/proveedores-cuentas/proveedor/${params.id}`,
+          {
+            method: "POST",
+            body: JSON.stringify(payload),
+          }
+        );
+      }
+    }
+  }
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setGuardando(true);
@@ -141,16 +194,11 @@ export default function EditarProveedorPage() {
           contacto_cargo: limpiarOpcional(form.contacto_cargo),
           contacto_celular: limpiarOpcional(form.contacto_celular),
           contacto_correo: limpiarOpcional(form.contacto_correo),
-          banco: limpiarOpcional(form.banco),
-          tipo_cuenta: limpiarOpcional(form.tipo_cuenta),
-          numero_cuenta: limpiarOpcional(form.numero_cuenta),
-          cci: limpiarOpcional(form.cci),
           cuenta_detracciones_bn: limpiarOpcional(form.cuenta_detracciones_bn),
-          moneda: form.moneda || "PEN",
-          titular_cuenta: limpiarOpcional(form.titular_cuenta),
           estado: form.estado || "activo",
         }),
       });
+      await guardarCuentasBancarias();
 
       router.push(`/proveedores/${params.id}`);
     } catch (error) {
@@ -324,74 +372,29 @@ export default function EditarProveedorPage() {
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="font-semibold text-[#102033]">4. Datos bancarios</h2>
+            <h2 className="font-semibold text-[#102033]">
+              4. Cuenta de detracciones
+            </h2>
 
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-[#102033]">
-                  Banco
-                </label>
-                <CustomSelect
-                  name="banco"
-                  value={form.banco}
-                  options={BANCO_OPTIONS}
-                  onChange={(value) =>
-                    setForm((prev) => ({ ...prev, banco: value }))
-                  }
-                  placeholder="Selecciona un banco"
-                />
-              </div>
+            <p className="mt-1 text-sm text-slate-500">
+              Opcional. Regístrala únicamente si el proveedor utiliza cuenta de detracciones.
+            </p>
 
+            <div className="mt-6 max-w-xl">
               <Campo
-                label="Tipo de cuenta"
-                name="tipo_cuenta"
-                value={form.tipo_cuenta}
-                onChange={handleChange}
-              />
-
-              <Campo
-                label="Número de cuenta"
-                name="numero_cuenta"
-                value={form.numero_cuenta}
-                onChange={handleChange}
-              />
-
-              <Campo
-                label="CCI"
-                name="cci"
-                value={form.cci}
-                onChange={handleChange}
-              />
-
-              <Campo
-                label="Cuenta de detracciones BN"
+                label="Cuenta del Banco de la Nación"
                 name="cuenta_detracciones_bn"
                 value={form.cuenta_detracciones_bn}
                 onChange={handleChange}
               />
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-[#102033]">
-                  Moneda
-                </label>
-                <select
-                  name="moneda"
-                  value={form.moneda}
-                  onChange={handleChange}
-                  className={selectClassName}
-                >
-                  <option value="PEN">Soles (PEN)</option>
-                  <option value="USD">Dólares (USD)</option>
-                </select>
-              </div>
-
-              <Campo
-                label="Titular de la cuenta"
-                name="titular_cuenta"
-                value={form.titular_cuenta}
-                onChange={handleChange}
-              />
             </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <ListaCuentasBancarias
+              value={cuentasBancarias}
+              onChange={setCuentasBancarias}
+            />
           </section>
 
           <div className="flex justify-end gap-3 pb-8">

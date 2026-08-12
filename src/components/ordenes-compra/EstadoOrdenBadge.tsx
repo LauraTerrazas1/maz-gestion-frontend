@@ -12,6 +12,9 @@ function formatearEstado(estado: string) {
   if (estado === "en_conformidad") return "En conformidad";
   if (estado === "aprobada") return "Aprobada";
   if (estado === "pagos_programados") return "Pagos programados";
+  if (estado === "conformidad_aprobada") return "Conformidad aprobada";
+  if (estado === "pago_parcial") return "Pago parcial";
+  if (estado === "pagada") return "Pagada";
   if (estado === "finalizada") return "Finalizada";
   if (estado === "anulada") return "Anulada";
 
@@ -55,6 +58,17 @@ function estadoClass(estado: string) {
 
   if (estado === "anulada") {
     return "border-red-200 bg-red-50 text-red-700";
+  }
+  if (estado === "conformidad_aprobada") {
+    return "border-green-200 bg-green-50 text-green-700";
+  }
+
+  if (estado === "pago_parcial") {
+    return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+
+  if (estado === "pagada") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
   return "border-slate-200 bg-slate-50 text-slate-600";

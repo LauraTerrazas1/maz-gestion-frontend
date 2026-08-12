@@ -20,26 +20,41 @@ type Proveedor = {
     contacto_cargo: string | null;
     contacto_celular: string | null;
     contacto_correo: string | null;
-    banco: string | null;
-    tipo_cuenta: string | null;
-    numero_cuenta: string | null;
-    cci: string | null;
-    moneda: string | null;
-    titular_cuenta: string | null;
     estado: string | null;
+    cuenta_detracciones_bn: string | null;
+};
+
+type CuentaBancaria = {
+    id: string;
+    banco: string;
+    tipo_cuenta: string;
+    moneda: string;
+    numero_cuenta: string;
+    cci: string | null;
+    titular_cuenta: string | null;
+    es_principal: boolean;
+    estado: string;
 };
 
 export default function DetalleProveedorPage() {
     const params = useParams<{ id: string }>();
     const [proveedor, setProveedor] = useState<Proveedor | null>(null);
+    const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
     const [cargando, setCargando] = useState(true);
     const [toast, setToast] = useState<{ tipo: ToastTipo; mensaje: string } | null>(null);
 
     useEffect(() => {
         void Promise.resolve().then(async () => {
             try {
-                const data = await apiFetch(`/proveedores/${params.id}`);
+                const [data, cuentasData] = await Promise.all([
+                    apiFetch(`/proveedores/${params.id}`),
+                    apiFetch(`/proveedores-cuentas/proveedor/${params.id}`),
+                ]);
+
                 setProveedor(data);
+                setCuentasBancarias(
+                    Array.isArray(cuentasData) ? cuentasData : []
+                );
             } catch (error) {
                 console.error("Error al cargar proveedor:", error);
                 setToast({ tipo: "error", mensaje: "No se pudo cargar el proveedor." });
@@ -271,20 +286,82 @@ export default function DetalleProveedorPage() {
                 </section>
 
                 <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div>
+                        <h2 className="text-lg font-semibold text-[#102033]">
+                            Cuentas bancarias
+                        </h2>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                            Cuentas registradas para realizar transferencias al proveedor.
+                        </p>
+                    </div>
+
+                    {cuentasBancarias.length === 0 ? (
+                        <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
+                            <p className="text-sm text-slate-500">
+                                No hay cuentas bancarias registradas.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                            {cuentasBancarias.map((cuenta) => (
+                                <div
+                                    key={cuenta.id}
+                                    className="rounded-xl border border-slate-200 bg-slate-50 p-5"
+                                >
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            {cuenta.es_principal && (
+                                                <p className="mb-1 text-xs font-semibold text-amber-600">
+                                                    ★ Cuenta principal
+                                                </p>
+                                            )}
+
+                                            <p className="text-lg font-bold text-[#102033]">
+                                                {cuenta.banco}
+                                            </p>
+
+                                            <p className="mt-1 text-sm text-slate-500">
+                                                {cuenta.tipo_cuenta} · {cuenta.moneda}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <InfoItem
+                                            label="Número de cuenta"
+                                            value={valor(cuenta.numero_cuenta)}
+                                        />
+
+                                        <InfoItem
+                                            label="CCI"
+                                            value={valor(cuenta.cci)}
+                                        />
+
+                                        <InfoItem
+                                            label="Titular"
+                                            value={valor(cuenta.titular_cuenta)}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+                <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h2 className="text-lg font-semibold text-[#102033]">
-                        Datos bancarios
+                        Cuenta de detracciones
                     </h2>
+
                     <p className="mt-1 text-sm text-slate-500">
-                        Cuenta donde se realizarán las transferencias al proveedor.
+                        Cuenta del Banco de la Nación para depósitos de detracciones.
                     </p>
 
-                    <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                        <InfoItem label="Banco" value={valor(proveedor.banco)} />
-                        <InfoItem label="Tipo de cuenta" value={valor(proveedor.tipo_cuenta)} />
-                        <InfoItem label="Número de cuenta" value={valor(proveedor.numero_cuenta)} />
-                        <InfoItem label="CCI" value={valor(proveedor.cci)} />
-                        <InfoItem label="Moneda" value={valor(proveedor.moneda)} />
-                        <InfoItem label="Titular de la cuenta" value={valor(proveedor.titular_cuenta)} />
+                    <div className="mt-5">
+                        <InfoItem
+                            label="Cuenta Banco de la Nación"
+                            value={valor(proveedor.cuenta_detracciones_bn)}
+                        />
                     </div>
                 </section>
 

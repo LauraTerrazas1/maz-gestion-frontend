@@ -8,6 +8,9 @@ import { apiFetch } from "@/lib/api";
 import Link from "next/link";
 import { pdf } from "@react-pdf/renderer";
 import OrdenCompraPdf from "@/components/pdf/OrdenCompraPdf";
+import Toast from "@/components/ui/Toast";
+import type { ToastTipo } from "@/components/ui/Toast";
+import ResumenFinancieroOcPdf from "@/components/pdf/ResumenFinancieroOcPdf";
 
 const logoUrl =
   "https://yoqporwshbseefndrtuu.supabase.co/storage/v1/object/public/logo/Logo%20MAZ.jpeg";
@@ -42,6 +45,7 @@ type OrdenCompra = {
 
   requiere_factura: boolean;
   estado: string;
+  estado_financiero?: string;
 
   archivo_cotizacion_url?: string | null;
   archivo_cotizacion_nombre?: string | null;
@@ -72,6 +76,59 @@ type OrdenCompra = {
   } | null;
 
   orden_compra_items?: ItemOC[];
+
+  resumen_pagos?: {
+    total_oc: number;
+    total_pagado: number;
+    total_programado_pendiente: number;
+    saldo_pendiente: number;
+    saldo_sin_programar: number;
+    proxima_fecha_pago: string | null;
+    proximo_monto: number;
+  };
+
+  evento_id: string;
+
+  historial_financiero?: {
+    facturas: Array<{
+      factura_id: string;
+      factura: string;
+      fecha_emision: string | null;
+      total: number;
+      moneda: string;
+      estado_factura: string | null;
+      estado_detraccion: string | null;
+      monto_detraccion: number;
+
+      conformidad?: {
+        conformidad_id: string;
+        estado: string | null;
+        revisado_por: string | null;
+        fecha_revision: string | null;
+        observaciones: string | null;
+      } | null;
+
+      programaciones: Array<{
+        programacion_id: string;
+        tipo_destino: string | null;
+        tipo_programacion: string | null;
+        monto_programado: number;
+        fecha_programada: string | null;
+        estado_programacion: string | null;
+        observaciones_programacion: string | null;
+
+        pago?: {
+          pago_id: string;
+          monto_pagado: number;
+          fecha_pago: string | null;
+          metodo_pago: string | null;
+          numero_operacion: string | null;
+          estado_pago: string | null;
+          observaciones_pago: string | null;
+        } | null;
+      }>;
+    }>;
+  };
 };
 
 function formatearFecha(fecha?: string | null) {
@@ -112,10 +169,20 @@ export default function DetalleOrdenCompraPage() {
 
   const [abriendoCotizacion, setAbriendoCotizacion] = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [generandoResumen, setGenerandoResumen] = useState(false);
   const [mostrarModalEmitir, setMostrarModalEmitir] = useState(false);
   const [emitiendoOrden, setEmitiendoOrden] = useState(false);
   const [mostrarModalEliminar, setMostrarModalEliminar] = useState(false);
   const [eliminandoOrden, setEliminandoOrden] = useState(false);
+
+
+  const [mostrarModalAlerta, setMostrarModalAlerta] = useState(false);
+  const [fechaAlertaSaldo, setFechaAlertaSaldo] = useState("");
+  const [creandoAlerta, setCreandoAlerta] = useState(false);
+  const [toast, setToast] = useState<{
+    tipo: ToastTipo;
+    mensaje: string;
+  } | null>(null);
 
   useEffect(() => {
     async function cargarOrden() {
@@ -194,9 +261,51 @@ export default function DetalleOrdenCompraPage() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error generando el PDF:", error);
-      alert("No se pudo generar el PDF.");
+      setToast({
+        tipo: "error",
+        mensaje: "No se pudo generar el PDF.",
+      });
     } finally {
       setGenerandoPdf(false);
+    }
+  }
+
+  async function descargarResumenFinanciero() {
+    if (!orden) return;
+
+    try {
+      setGenerandoResumen(true);
+
+      const documento = (
+        <ResumenFinancieroOcPdf orden={orden} />
+      );
+
+      const blob = await pdf(documento).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement("a");
+
+      enlace.href = url;
+      enlace.download = `Resumen-${orden.numero_oc}.pdf`;
+
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(
+        "Error generando resumen financiero:",
+        error
+      );
+
+      setToast({
+        tipo: "error",
+        mensaje:
+          "No se pudo generar el resumen financiero.",
+      });
+    } finally {
+      setGenerandoResumen(false);
     }
   }
   async function emitirOrden() {
@@ -255,6 +364,51 @@ export default function DetalleOrdenCompraPage() {
     }
   }
 
+  async function crearAlertaSaldo() {
+    if (!orden || !fechaAlertaSaldo) {
+      setToast({
+        tipo: "info",
+        mensaje: "Selecciona una fecha para la alerta.",
+      });
+      return;
+    }
+
+    try {
+      setCreandoAlerta(true);
+
+      await apiFetch("/alertas/", {
+        method: "POST",
+        body: JSON.stringify({
+          evento_id: orden.evento_id,
+          tipo_alerta: "pago_pendiente",
+          origen: "orden_compra",
+          titulo: `Saldo pendiente ${orden.numero_oc}`,
+          descripcion: `La orden ${orden.numero_oc} tiene un saldo pendiente de ${formatearMoneda(
+            orden.resumen_pagos?.saldo_pendiente ?? 0,
+            orden.moneda
+          )}.`,
+          fecha_alerta: fechaAlertaSaldo,
+        }),
+      });
+
+      setMostrarModalAlerta(false);
+      setFechaAlertaSaldo("");
+
+      setToast({
+        tipo: "success",
+        mensaje: "Alerta creada correctamente.",
+      });
+    } catch (error) {
+      console.error("Error creando alerta:", error);
+      setToast({
+        tipo: "error",
+        mensaje: "No se pudo crear la alerta.",
+      });
+    } finally {
+      setCreandoAlerta(false);
+    }
+  }
+
   return (
     <MainLayout>
       <main className="min-h-screen bg-[#F6F8FB] p-6 lg:p-8">
@@ -294,7 +448,9 @@ export default function DetalleOrdenCompraPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <EstadoOrdenBadge estado={orden.estado} />
+                  <EstadoOrdenBadge
+                    estado={orden.estado_financiero || orden.estado}
+                  />
 
                   {orden.estado === "borrador" && (
                     <Link
@@ -313,15 +469,13 @@ export default function DetalleOrdenCompraPage() {
                       Emitir orden
                     </button>
                   )}
-                  {orden.estado === "borrador" && (
-                    <button
-                      type="button"
-                      onClick={() => setMostrarModalEliminar(true)}
-                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100"
-                    >
-                      Eliminar
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setMostrarModalEliminar(true)}
+                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+                  >
+                    Eliminar
+                  </button>
                   {orden.estado !== "borrador" && (
                     <button
                       type="button"
@@ -332,6 +486,16 @@ export default function DetalleOrdenCompraPage() {
                       {generandoPdf ? "Generando PDF..." : "Descargar PDF"}
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={descargarResumenFinanciero}
+                    disabled={generandoResumen}
+                    className="rounded-xl border border-[#2F73D9] bg-white px-4 py-2.5 text-sm font-semibold text-[#2F73D9] transition hover:bg-blue-50 disabled:opacity-60"
+                  >
+                    {generandoResumen
+                      ? "Generando resumen..."
+                      : "Descargar resumen"}
+                  </button>
                 </div>
               </div>
 
@@ -406,12 +570,133 @@ export default function DetalleOrdenCompraPage() {
                     </div>
                   </div>
                 </header>
-                <div className="no-print border-b border-slate-200 bg-white px-6 py-5 lg:px-9">
-                  <FlujoOrdenCompra
-                    estado={orden.estado}
-                    requiereFactura={orden.requiere_factura}
-                  />
-                </div>
+                {/* Estado de pagos */}
+                {orden.resumen_pagos && (
+                  <div className="no-print border-b border-slate-200 bg-white px-6 py-5 lg:px-9">
+                    <SeccionDocumento titulo="Estado de pagos de la OC">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
+                        {/* Total OC */}
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Total OC
+                          </p>
+
+                          <p className="mt-2 text-xl font-bold text-[#102033]">
+                            {formatearMoneda(
+                              orden.resumen_pagos.total_oc,
+                              orden.moneda
+                            )}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            Importe total de la orden
+                          </p>
+                        </div>
+
+                        {/* Total pagado */}
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                            Total pagado
+                          </p>
+
+                          <p className="mt-2 text-xl font-bold text-emerald-700">
+                            {formatearMoneda(
+                              orden.resumen_pagos.total_pagado,
+                              orden.moneda
+                            )}
+                          </p>
+
+                          <p className="mt-1 text-xs text-emerald-700/70">
+                            Pagos ejecutados
+                          </p>
+                        </div>
+
+                        {/* Programado pendiente */}
+                        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                            Programado pendiente
+                          </p>
+
+                          <p className="mt-2 text-xl font-bold text-blue-700">
+                            {formatearMoneda(
+                              orden.resumen_pagos.total_programado_pendiente,
+                              orden.moneda
+                            )}
+                          </p>
+
+                          <p className="mt-1 text-xs text-blue-700/70">
+                            Pagos programados aún no ejecutados
+                          </p>
+                        </div>
+
+                        {/* Saldo sin programar */}
+                        <div
+                          className={`rounded-2xl border p-4 ${orden.resumen_pagos.saldo_sin_programar > 0
+                            ? "border-amber-200 bg-amber-50"
+                            : "border-emerald-200 bg-emerald-50"
+                            }`}
+                        >
+                          <p
+                            className={`text-xs font-semibold uppercase tracking-wide ${orden.resumen_pagos.saldo_sin_programar > 0
+                              ? "text-amber-700"
+                              : "text-emerald-700"
+                              }`}
+                          >
+                            Saldo sin programar
+                          </p>
+
+                          <p
+                            className={`mt-2 text-xl font-bold ${orden.resumen_pagos.saldo_sin_programar > 0
+                              ? "text-amber-700"
+                              : "text-emerald-700"
+                              }`}
+                          >
+                            {formatearMoneda(
+                              orden.resumen_pagos.saldo_sin_programar,
+                              orden.moneda
+                            )}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            {orden.resumen_pagos.saldo_sin_programar > 0
+                              ? "Importe que falta programar"
+                              : "Todo el saldo está cubierto"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Aviso de saldo sin programar */}
+                      {orden.resumen_pagos.saldo_sin_programar > 0 && (
+                        <div className="mt-3 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-start gap-3">
+                            <span className="mt-0.5 text-amber-600">
+                              ⚠
+                            </span>
+
+                            <p className="text-sm text-amber-800">
+                              Hay{" "}
+                              <strong>
+                                {formatearMoneda(
+                                  orden.resumen_pagos.saldo_sin_programar,
+                                  orden.moneda
+                                )}
+                              </strong>{" "}
+                              de esta OC que todavía no tienen programación de pago.
+                            </p>
+                          </div>
+
+                          <Link
+                            href="/programaciones-pago/nuevo"
+                            className="shrink-0 rounded-lg bg-[#2F73D9] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#245DB3]"
+                          >
+                            Programar saldo
+                          </Link>
+                        </div>
+                      )}
+                    </SeccionDocumento>
+                  </div>
+                )}
                 <div className="space-y-7 p-6 lg:p-9">
                   {/* Datos del proveedor */}
                   <SeccionDocumento titulo="Datos del proveedor">
@@ -662,7 +947,6 @@ export default function DetalleOrdenCompraPage() {
                       </div>
                     </div>
                   </div>
-
                   {/* Cotización */}
                   <div className="no-print">
                     <SeccionDocumento titulo="Cotización del proveedor">
@@ -760,6 +1044,13 @@ export default function DetalleOrdenCompraPage() {
             </>
           )}
         </div>
+        {toast && (
+          <Toast
+            tipo={toast.tipo}
+            mensaje={toast.mensaje}
+            onClose={() => setToast(null)}
+          />
+        )}
       </main>
       {mostrarModalEmitir && orden && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-4">
@@ -859,7 +1150,8 @@ export default function DetalleOrdenCompraPage() {
               <span className="font-semibold text-[#102033]">
                 {orden.numero_oc}
               </span>
-              .
+              {" "}junto con sus facturas, conformidades,
+              programaciones, pagos y registros asociados.
             </p>
 
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
@@ -885,6 +1177,67 @@ export default function DetalleOrdenCompraPage() {
                 className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
               >
                 {eliminandoOrden ? "Eliminando..." : "Sí, eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {mostrarModalAlerta && orden && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-600">
+              Recordatorio de pago
+            </p>
+
+            <h2 className="mt-2 text-xl font-bold text-[#102033]">
+              Crear alerta de saldo
+            </h2>
+
+            <p className="mt-3 text-sm text-slate-600">
+              Saldo pendiente de{" "}
+              <strong>
+                {formatearMoneda(
+                  orden.resumen_pagos?.saldo_pendiente ?? 0,
+                  orden.moneda
+                )}
+              </strong>
+              {" "}para {orden.numero_oc}.
+            </p>
+
+            <div className="mt-5">
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Fecha de alerta *
+              </label>
+
+              <input
+                type="date"
+                value={fechaAlertaSaldo}
+                onChange={(event) =>
+                  setFechaAlertaSaldo(event.target.value)
+                }
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#2F73D9]"
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setMostrarModalAlerta(false)}
+                disabled={creandoAlerta}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={crearAlertaSaldo}
+                disabled={creandoAlerta || !fechaAlertaSaldo}
+                className="rounded-xl bg-[#2F73D9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#245DB3] disabled:opacity-60"
+              >
+                {creandoAlerta
+                  ? "Creando..."
+                  : "Crear alerta"}
               </button>
             </div>
           </div>
@@ -988,136 +1341,6 @@ function FilaTotal({
       <span className="font-bold text-[#102033]">
         {valor}
       </span>
-    </div>
-  );
-}
-function FlujoOrdenCompra({
-  estado,
-  requiereFactura,
-}: {
-  estado: string;
-  requiereFactura: boolean;
-}) {
-  const etapas = [
-    {
-      clave: "oc",
-      titulo: "Orden creada",
-    },
-    {
-      clave: "factura",
-      titulo: requiereFactura ? "Factura" : "Factura omitida",
-    },
-    {
-      clave: "conformidad",
-      titulo: "Conformidad",
-    },
-    {
-      clave: "pagos",
-      titulo: "Pagos",
-    },
-  ];
-
-  function indiceActual() {
-    if (
-      estado === "borrador" ||
-      estado === "pendiente_aprobacion" ||
-      estado === "pendiente_factura"
-    ) {
-      return 0;
-    }
-
-    if (
-      estado === "factura_recibida" ||
-      estado === "en_conformidad"
-    ) {
-      return requiereFactura ? 1 : 2;
-    }
-
-    if (estado === "aprobada") {
-      return 2;
-    }
-
-    if (
-      estado === "pagos_programados" ||
-      estado === "finalizada"
-    ) {
-      return 3;
-    }
-
-    return 0;
-  }
-
-  const actual = indiceActual();
-
-  return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2F73D9]">
-            Seguimiento del proceso
-          </p>
-
-          <p className="mt-1 text-sm text-slate-500">
-            Estado actual de la orden dentro del flujo financiero.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-4">
-        {etapas.map((etapa, index) => {
-          const completada =
-            index < actual ||
-            (!requiereFactura && etapa.clave === "factura");
-
-          const activa = index === actual;
-
-          return (
-            <div
-              key={etapa.clave}
-              className={`relative rounded-2xl border px-4 py-4 transition ${activa
-                ? "border-[#2F73D9] bg-blue-50"
-                : completada
-                  ? "border-[#BFE3A7] bg-[#F3FAEF]"
-                  : "border-slate-200 bg-slate-50"
-                }`}
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${activa
-                    ? "bg-[#2F73D9] text-white"
-                    : completada
-                      ? "bg-[#78B94A] text-white"
-                      : "bg-slate-200 text-slate-500"
-                    }`}
-                >
-                  {completada ? "✓" : index + 1}
-                </span>
-
-                <div>
-                  <p
-                    className={`text-sm font-semibold ${activa
-                      ? "text-[#245DB3]"
-                      : completada
-                        ? "text-[#347326]"
-                        : "text-slate-500"
-                      }`}
-                  >
-                    {etapa.titulo}
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    {activa
-                      ? "Etapa actual"
-                      : completada
-                        ? "Completada"
-                        : "Pendiente"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

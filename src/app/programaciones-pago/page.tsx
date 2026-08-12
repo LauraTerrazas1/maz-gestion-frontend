@@ -60,7 +60,7 @@ type Factura = {
     numero: string;
     total?: number | string | null;
     moneda?: string | null;
-
+    cuenta_detraccion_detectada?: string | null;
     monto_detraccion?: number | string | null;
     estado_conformidad?: string | null;
 
@@ -103,6 +103,33 @@ type ProgramacionPago = {
     facturas?: Factura | null;
     evento_proveedores?: EventoProveedor | null;
     proveedores_cuentas_bancarias?: CuentaBancaria | null;
+};
+type DetraccionPendiente = {
+    factura_id: string;
+    factura: string;
+
+    orden_compra_id?: string | null;
+    numero_oc?: string | null;
+
+    proveedor_id?: string | null;
+    proveedor?: string | null;
+    ruc?: string | null;
+
+    evento_id?: string | null;
+    evento?: string | null;
+    cliente?: string | null;
+
+    fecha_emision?: string | null;
+
+    codigo_detraccion?: string | null;
+    porcentaje_detraccion?: number | null;
+
+    monto_detraccion: number;
+    programado_detraccion: number;
+    pendiente_detraccion: number;
+
+    cuenta_bn?: string | null;
+    moneda?: string | null;
 };
 
 type CSVRow = Record<
@@ -294,6 +321,15 @@ export default function ProgramacionesPagoPage() {
         programaciones,
         setProgramaciones,
     ] = useState<ProgramacionPago[]>([]);
+    const [
+        detraccionesPendientes,
+        setDetraccionesPendientes,
+    ] = useState<DetraccionPendiente[]>([]);
+
+    const [
+        mostrarDetracciones,
+        setMostrarDetracciones,
+    ] = useState(false);
 
     const [cargando, setCargando] =
         useState(true);
@@ -360,7 +396,29 @@ export default function ProgramacionesPagoPage() {
 
     useEffect(() => {
         cargarProgramaciones();
+        cargarDetraccionesPendientes();
     }, []);
+
+    async function cargarDetraccionesPendientes() {
+        try {
+            const data = await apiFetch(
+                "/programaciones-pago/detracciones-pendientes"
+            );
+
+            setDetraccionesPendientes(
+                Array.isArray(data)
+                    ? data
+                    : []
+            );
+        } catch (error) {
+            console.error(
+                "Error cargando detracciones pendientes:",
+                error
+            );
+
+            setDetraccionesPendientes([]);
+        }
+    }
 
     const programacionesFiltradas =
         useMemo(() => {
@@ -566,16 +624,11 @@ export default function ProgramacionesPagoPage() {
     }
 
     function handleDescargarCSV() {
-        if (
-            programacionesFiltradas.length ===
-            0
-        ) {
+        if (programacionesFiltradas.length === 0) {
             setToast({
                 tipo: "info",
-                mensaje:
-                    "No hay programaciones para exportar.",
+                mensaje: "No hay programaciones para exportar.",
             });
-
             return;
         }
 
@@ -595,12 +648,36 @@ export default function ProgramacionesPagoPage() {
                     label: "Proveedor u origen",
                 },
                 {
+                    key: "ruc",
+                    label: "RUC / Documento",
+                },
+                {
                     key: "evento",
                     label: "Evento",
                 },
                 {
                     key: "destino",
                     label: "Destino",
+                },
+                {
+                    key: "banco",
+                    label: "Banco",
+                },
+                {
+                    key: "tipo_cuenta",
+                    label: "Tipo de cuenta",
+                },
+                {
+                    key: "numero_cuenta",
+                    label: "Número de cuenta",
+                },
+                {
+                    key: "cci",
+                    label: "CCI",
+                },
+                {
+                    key: "titular",
+                    label: "Titular de cuenta",
                 },
                 {
                     key: "tipo",
@@ -623,76 +700,99 @@ export default function ProgramacionesPagoPage() {
                     label: "Observaciones",
                 },
             ],
-            programacionesFiltradas.map(
-                (programacion) => {
-                    const factura =
-                        obtenerFactura(
-                            programacion
-                        );
 
-                    const orden =
-                        obtenerOrden(
-                            programacion
-                        );
+            programacionesFiltradas.map((programacion) => {
+                const factura = obtenerFactura(programacion);
+                const orden = obtenerOrden(programacion);
+                const proveedor = obtenerProveedor(programacion);
+                const evento = obtenerEvento(programacion);
 
-                    const evento =
-                        obtenerEvento(
-                            programacion
-                        );
+                const cuenta =
+                    programacion.proveedores_cuentas_bancarias ?? null;
 
-                    return {
-                        factura: factura
-                            ? `${factura.serie}-${factura.numero}`
-                            : "Sin factura",
+                const esDetraccion =
+                    programacion.tipo_destino === "detraccion";
 
-                        orden_compra:
-                            orden?.numero_oc ??
-                            "No registrada",
+                return {
+                    factura: factura
+                        ? `${factura.serie}-${factura.numero}`
+                        : "Sin factura",
 
-                        proveedor:
-                            obtenerNombreOrigen(
-                                programacion
-                            ),
+                    orden_compra:
+                        orden?.numero_oc ?? "No registrada",
 
-                        evento:
-                            evento?.nombre ??
-                            "No registrado",
+                    proveedor:
+                        obtenerNombreOrigen(programacion),
 
-                        destino:
-                            textoDestino(
-                                programacion
-                                    .tipo_destino
-                            ),
+                    ruc:
+                        proveedor?.documento
+                            ? `="${proveedor.documento}"`
+                            : "",
 
-                        tipo:
-                            textoTipoProgramacion(
-                                programacion
-                                    .tipo_programacion
-                            ),
+                    evento:
+                        evento?.nombre ?? "No registrado",
 
-                        monto: Number(
-                            programacion.monto ??
-                            0
-                        ).toFixed(2),
+                    destino:
+                        textoDestino(programacion.tipo_destino),
 
-                        fecha:
-                            programacion
-                                .fecha_programada,
+                    banco: esDetraccion
+                        ? "Banco de la Nación"
+                        : cuenta?.banco ?? "",
 
-                        estado:
-                            textoEstado(
-                                programacion.estado
-                            ),
+                    tipo_cuenta: esDetraccion
+                        ? "Cuenta de detracciones"
+                        : cuenta?.tipo_cuenta ?? "",
 
-                        observaciones:
-                            programacion
-                                .observaciones ??
-                            "",
-                    };
-                }
-            )
+                    numero_cuenta: esDetraccion
+                        ? factura?.cuenta_detraccion_detectada
+                            ? `="${factura.cuenta_detraccion_detectada}"`
+                            : ""
+                        : cuenta?.numero_cuenta
+                            ? `="${cuenta.numero_cuenta}"`
+                            : "",
+
+                    cci: esDetraccion
+                        ? ""
+                        : cuenta?.cci
+                            ? `="${cuenta.cci}"`
+                            : "",
+
+                    titular: esDetraccion
+                        ? obtenerNombreOrigen(programacion)
+                        : cuenta?.titular_cuenta ?? "",
+
+                    tipo:
+                        textoTipoProgramacion(
+                            programacion.tipo_programacion
+                        ),
+
+                    monto: Number(
+                        programacion.monto ?? 0
+                    ).toFixed(2),
+
+                    fecha:
+                        programacion.fecha_programada,
+
+                    estado:
+                        textoEstado(programacion.estado),
+
+                    observaciones:
+                        esDetraccion
+                            ? ""
+                            : programacion.observaciones ?? "",
+                };
+            })
         );
     }
+    const totalDetraccionesPendientes =
+        detraccionesPendientes.reduce(
+            (total, item) =>
+                total +
+                Number(
+                    item.pendiente_detraccion ?? 0
+                ),
+            0
+        );
 
     return (
         <MainLayout>
@@ -731,7 +831,7 @@ export default function ProgramacionesPagoPage() {
                         </div>
                     </div>
 
-                    <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <ResumenCard
                             titulo="Programados"
                             monto={
@@ -763,8 +863,255 @@ export default function ProgramacionesPagoPage() {
                             }
                             tipo="pagado"
                         />
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setMostrarDetracciones(
+                                    (actual) => !actual
+                                )
+                            }
+                            className="text-left"
+                        >
+                            <ResumenCard
+                                titulo="Detracciones pendientes"
+                                monto={
+                                    totalDetraccionesPendientes
+                                }
+                                descripcion={`${detraccionesPendientes.length} pendiente${detraccionesPendientes.length === 1
+                                    ? ""
+                                    : "s"
+                                    } de programación`}
+                                icono={
+                                    <Landmark className="h-5 w-5" />
+                                }
+                                tipo="detraccion"
+                            />
+                        </button>
                     </section>
+                    {mostrarDetracciones && (
+                        <section className="mt-6 overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
+                            <div className="flex flex-col justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center">
+                                <div>
+                                    <h2 className="font-semibold text-[#102033]">
+                                        Detracciones pendientes de programación
+                                    </h2>
 
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Facturas con detracción aún no programada.
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (detraccionesPendientes.length === 0) {
+                                            setToast({
+                                                tipo: "info",
+                                                mensaje:
+                                                    "No hay detracciones pendientes para descargar.",
+                                            });
+
+                                            return;
+                                        }
+
+                                        descargarCSV(
+                                            "detracciones_pendientes_programacion.csv",
+                                            [
+                                                {
+                                                    key: "factura",
+                                                    label: "Factura",
+                                                },
+                                                {
+                                                    key: "orden_compra",
+                                                    label: "Orden de compra",
+                                                },
+                                                {
+                                                    key: "proveedor",
+                                                    label: "Proveedor",
+                                                },
+                                                {
+                                                    key: "ruc",
+                                                    label: "RUC",
+                                                },
+                                                {
+                                                    key: "evento",
+                                                    label: "Evento",
+                                                },
+                                                {
+                                                    key: "cuenta_bn",
+                                                    label: "Cuenta Banco de la Nación",
+                                                },
+                                                {
+                                                    key: "codigo",
+                                                    label: "Código detracción",
+                                                },
+                                                {
+                                                    key: "porcentaje",
+                                                    label: "Porcentaje detracción",
+                                                },
+                                                {
+                                                    key: "monto",
+                                                    label: "Monto pendiente",
+                                                },
+                                            ],
+                                            detraccionesPendientes.map(
+                                                (item) => ({
+                                                    factura:
+                                                        item.factura ||
+                                                        "No registrada",
+
+                                                    orden_compra:
+                                                        item.numero_oc ||
+                                                        "No registrada",
+
+                                                    proveedor:
+                                                        item.proveedor ||
+                                                        "No registrado",
+
+                                                    ruc:
+                                                        item.ruc ||
+                                                        "",
+
+                                                    evento:
+                                                        item.evento ||
+                                                        "No registrado",
+
+                                                    cuenta_bn:
+                                                        item.cuenta_bn ||
+                                                        "",
+
+                                                    codigo:
+                                                        item.codigo_detraccion ||
+                                                        "",
+
+                                                    porcentaje:
+                                                        item.porcentaje_detraccion ??
+                                                        0,
+
+                                                    monto:
+                                                        Number(
+                                                            item.pendiente_detraccion ??
+                                                            0
+                                                        ).toFixed(2),
+                                                })
+                                            )
+                                        );
+                                    }}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#102033] shadow-sm transition hover:bg-slate-50"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Descargar CSV
+                                </button>
+                            </div>
+
+                            {detraccionesPendientes.length === 0 ? (
+                                <div className="p-8 text-center text-sm text-slate-500">
+                                    No hay detracciones pendientes de programación.
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[1050px] text-sm">
+                                        <thead className="bg-amber-50 text-slate-600">
+                                            <tr>
+                                                <th className="px-5 py-3 text-left">
+                                                    Factura
+                                                </th>
+
+                                                <th className="px-5 py-3 text-left">
+                                                    OC
+                                                </th>
+
+                                                <th className="px-5 py-3 text-left">
+                                                    Proveedor
+                                                </th>
+
+                                                <th className="px-5 py-3 text-left">
+                                                    RUC
+                                                </th>
+
+                                                <th className="px-5 py-3 text-left">
+                                                    Cuenta BN
+                                                </th>
+
+                                                <th className="px-5 py-3 text-left">
+                                                    %
+                                                </th>
+
+                                                <th className="px-5 py-3 text-right">
+                                                    Monto pendiente
+                                                </th>
+
+                                                <th className="px-5 py-3 text-right">
+                                                    Acción
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody>
+                                            {detraccionesPendientes.map(
+                                                (item) => (
+                                                    <tr
+                                                        key={item.factura_id}
+                                                        className="border-t border-slate-100"
+                                                    >
+                                                        <td className="px-5 py-4 font-semibold text-[#102033]">
+                                                            {item.factura ||
+                                                                "No registrada"}
+                                                        </td>
+
+                                                        <td className="px-5 py-4">
+                                                            {item.numero_oc ||
+                                                                "No registrada"}
+                                                        </td>
+
+                                                        <td className="px-5 py-4">
+                                                            {item.proveedor ||
+                                                                "No registrado"}
+                                                        </td>
+
+                                                        <td className="px-5 py-4">
+                                                            {item.ruc ||
+                                                                "No registrado"}
+                                                        </td>
+
+                                                        <td className="px-5 py-4">
+                                                            {item.cuenta_bn ||
+                                                                "No registrada"}
+                                                        </td>
+
+                                                        <td className="px-5 py-4">
+                                                            {Number(
+                                                                item.porcentaje_detraccion ??
+                                                                0
+                                                            ).toFixed(2)}
+                                                            %
+                                                        </td>
+
+                                                        <td className="px-5 py-4 text-right font-bold text-[#102033]">
+                                                            {formatearMoneda(
+                                                                item.pendiente_detraccion,
+                                                                item.moneda ||
+                                                                "PEN"
+                                                            )}
+                                                        </td>
+
+                                                        <td className="px-5 py-4 text-right">
+                                                            <Link
+                                                                href="/programaciones-pago/nuevo"
+                                                                className="inline-flex items-center rounded-lg bg-[#2F73D9] px-3 py-2 text-xs font-semibold text-white hover:bg-[#245DB3]"
+                                                            >
+                                                                Programar
+                                                            </Link>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </section>
+                    )}
                     <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                             <div>
@@ -1201,7 +1548,8 @@ function ResumenCard({
     tipo:
     | "programado"
     | "vencido"
-    | "pagado";
+    | "pagado"
+    | "detraccion";
 }) {
     const estilos = {
         programado:
@@ -1212,6 +1560,8 @@ function ResumenCard({
 
         pagado:
             "border-emerald-200 bg-emerald-50 text-emerald-700",
+        detraccion:
+            "border-amber-200 bg-amber-50 text-amber-700",
     };
 
     return (

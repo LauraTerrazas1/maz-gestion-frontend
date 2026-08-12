@@ -49,7 +49,15 @@ export default function AsociarProveedorPage() {
         const proveedoresData = await apiFetch("/proveedores/");
         setProveedores(
           Array.isArray(proveedoresData)
-            ? proveedoresData.filter((p: Proveedor) => p.estado === "activo")
+            ? proveedoresData
+              .filter((p: Proveedor) => p.estado === "activo")
+              .sort((a: Proveedor, b: Proveedor) =>
+                (a.razon_social || "").localeCompare(
+                  b.razon_social || "",
+                  "es",
+                  { sensitivity: "base" }
+                )
+              )
             : []
         );
       } catch (error) {

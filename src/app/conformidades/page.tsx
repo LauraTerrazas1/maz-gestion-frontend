@@ -120,6 +120,19 @@ export default function ConformidadesPage() {
                 return "bg-yellow-100 text-yellow-700";
         }
     }
+
+    const conformidadesPendientes = conformidades.filter(
+        (item) => item.estado === "pendiente"
+    ).length;
+
+    const conformidadesObservadas = conformidades.filter(
+        (item) => item.estado === "observada"
+    ).length;
+
+    const conformidadesAprobadas = conformidades.filter(
+        (item) => item.estado === "aprobada"
+    ).length;
+
     return (
         <MainLayout>
             <main className="min-h-screen bg-[#F6F8FB] p-8">
@@ -148,7 +161,51 @@ export default function ConformidadesPage() {
                     </Link>
 
                 </div>
+                {/* Indicadores */}
 
+                <div className="mb-6 grid gap-4 md:grid-cols-3">
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                        <p className="text-sm font-medium text-amber-700">
+                            Pendientes de revisar
+                        </p>
+
+                        <p className="mt-2 text-3xl font-bold text-amber-700">
+                            {conformidadesPendientes}
+                        </p>
+
+                        <p className="mt-1 text-xs text-amber-700/70">
+                            Conformidades que requieren revisión
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+                        <p className="text-sm font-medium text-red-700">
+                            Observadas
+                        </p>
+
+                        <p className="mt-2 text-3xl font-bold text-red-700">
+                            {conformidadesObservadas}
+                        </p>
+
+                        <p className="mt-1 text-xs text-red-700/70">
+                            Requieren corrección o validación
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                        <p className="text-sm font-medium text-emerald-700">
+                            Aprobadas
+                        </p>
+
+                        <p className="mt-2 text-3xl font-bold text-emerald-700">
+                            {conformidadesAprobadas}
+                        </p>
+
+                        <p className="mt-1 text-xs text-emerald-700/70">
+                            Conformidades aprobadas
+                        </p>
+                    </div>
+                </div>
                 {/* Filtros */}
 
                 <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

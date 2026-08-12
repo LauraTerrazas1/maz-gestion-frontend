@@ -114,6 +114,31 @@ type Pago = {
   comprobantes_pago?: ComprobantePago[];
 };
 
+type DetraccionProgramadaPendiente = {
+  programacion_id: string;
+  factura_id: string;
+  factura: string;
+
+  orden_compra_id?: string | null;
+  numero_oc?: string | null;
+
+  proveedor?: string | null;
+  ruc?: string | null;
+
+  evento?: string | null;
+  cliente?: string | null;
+
+  cuenta_bn?: string | null;
+  codigo_detraccion?: string | null;
+  porcentaje_detraccion?: number | null;
+
+  monto: number;
+  moneda?: string | null;
+
+  fecha_programada: string | null;
+  estado: string;
+};
+
 type ResumenPago = {
   pendiente: number;
   programado: number;
@@ -276,6 +301,13 @@ export default function PagosPage() {
   const [pagos, setPagos] =
     useState<Pago[]>([]);
 
+  const [
+    detraccionesPendientesPago,
+    setDetraccionesPendientesPago,
+  ] = useState<DetraccionProgramadaPendiente[]>([]);
+
+  const [mostrarDetracciones, setMostrarDetracciones] = useState(false);
+
   const [cargando, setCargando] =
     useState(true);
 
@@ -359,8 +391,27 @@ export default function PagosPage() {
 
   useEffect(() => {
     cargarPagos();
+    cargarDetraccionesPendientesPago();
   }, []);
 
+  async function cargarDetraccionesPendientesPago() {
+    try {
+      const data = await apiFetch(
+        "/programaciones-pago/detracciones-programadas-pendientes"
+      );
+
+      setDetraccionesPendientesPago(
+        Array.isArray(data) ? data : []
+      );
+    } catch (error) {
+      console.error(
+        "Error cargando detracciones pendientes de pago:",
+        error
+      );
+
+      setDetraccionesPendientesPago([]);
+    }
+  }
   const pagosFiltrados = useMemo(() => {
     return pagos.filter((pago) => {
       const factura =
@@ -863,7 +914,9 @@ export default function PagosPage() {
       setToast({
         tipo: "error",
         mensaje:
-          "No se pudo subir el comprobante.",
+          error instanceof Error
+            ? error.message
+            : "No se pudo subir el comprobante.",
       });
     } finally {
       setSubiendoComprobante(false);
@@ -873,45 +926,53 @@ export default function PagosPage() {
   function renderAccionPago(pago: Pago) {
     const comprobante = obtenerComprobante(pago);
 
-    if (comprobante) {
-      return (
-        <button
-          type="button"
-          onClick={() => handleVerComprobante(pago.id)}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-[#102033] transition hover:bg-slate-50"
-        >
-          <Eye className="h-4 w-4" />
-          Ver comprobante
-        </button>
-      );
-    }
-
-    if (
-      pago.estado === "pagado" ||
-      pago.estado === "pagado_sin_comprobante"
-    ) {
-      return (
-        <button
-          type="button"
-          onClick={() => seleccionarComprobante(pago)}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
-        >
-          <Upload className="h-4 w-4" />
-          Subir comprobante
-        </button>
-      );
-    }
-
     return (
-      <Link
-        href={`/pagos/${pago.id}`}
-        className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-[#102033] transition hover:bg-slate-50"
-      >
-        <Eye className="h-4 w-4" />
-        Ver detalle
-      </Link>
+      <div className="flex items-center justify-end gap-2">
+        <Link
+          href={`/pagos/${pago.id}/editar`}
+          className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-[#102033] transition hover:bg-slate-50"
+        >
+          Editar
+        </Link>
+
+        {comprobante ? (
+          <button
+            type="button"
+            onClick={() => handleVerComprobante(pago.id)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-[#102033] transition hover:bg-slate-50"
+          >
+            <Eye className="h-4 w-4" />
+            Ver comprobante
+          </button>
+        ) : pago.estado === "pagado" ||
+          pago.estado === "pagado_sin_comprobante" ? (
+          <button
+            type="button"
+            onClick={() => seleccionarComprobante(pago)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+          >
+            <Upload className="h-4 w-4" />
+            Subir comprobante
+          </button>
+        ) : (
+          <Link
+            href={`/pagos/${pago.id}`}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-[#102033] transition hover:bg-slate-50"
+          >
+            <Eye className="h-4 w-4" />
+            Ver detalle
+          </Link>
+        )}
+      </div>
     );
   }
+
+  const totalDetraccionesPendientesPago =
+    detraccionesPendientesPago.reduce(
+      (total, item) => total + Number(item.monto || 0),
+      0
+    );
+
   return (
     <MainLayout>
       <main className="min-h-screen bg-[#F6F8FB] p-6 md:p-8">
@@ -952,7 +1013,7 @@ export default function PagosPage() {
 
           {/* Resumen */}
 
-          <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <ResumenCard
               titulo="Total pagado"
               monto={resumen.pagado}
@@ -1000,7 +1061,179 @@ export default function PagosPage() {
               }
               tipo="pendiente"
             />
+
+            <button
+              type="button"
+              onClick={() =>
+                setMostrarDetracciones((actual) => !actual)
+              }
+              className="text-left"
+            >
+              <ResumenCard
+                titulo="Detracciones pendientes de pago"
+                monto={totalDetraccionesPendientesPago}
+                descripcion={`${detraccionesPendientesPago.length} programada${detraccionesPendientesPago.length === 1 ? "" : "s"
+                  } aún sin pagar`}
+                icono={<Landmark className="h-5 w-5" />}
+                tipo="detraccion"
+              />
+            </button>
           </section>
+          {mostrarDetracciones && (
+            <section className="mt-6 overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
+              <div className="flex flex-col justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center">
+                <div>
+                  <h2 className="font-semibold text-[#102033]">
+                    Detracciones pendientes de pago
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Detracciones ya programadas que todavía no han sido pagadas.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (detraccionesPendientesPago.length === 0) {
+                      setToast({
+                        tipo: "info",
+                        mensaje:
+                          "No hay detracciones pendientes de pago para descargar.",
+                      });
+
+                      return;
+                    }
+
+                    descargarCSV(
+                      "detracciones_pendientes_pago.csv",
+                      [
+                        { key: "factura", label: "Factura" },
+                        { key: "orden_compra", label: "Orden de compra" },
+                        { key: "proveedor", label: "Proveedor" },
+                        { key: "ruc", label: "RUC" },
+                        { key: "evento", label: "Evento" },
+                        { key: "cuenta_bn", label: "Cuenta Banco de la Nación" },
+                        { key: "codigo", label: "Código detracción" },
+                        { key: "porcentaje", label: "Porcentaje detracción" },
+                        { key: "monto", label: "Monto" },
+                        { key: "fecha_programada", label: "Fecha programada" },
+                        { key: "estado", label: "Estado" },
+                      ],
+                      detraccionesPendientesPago.map((item) => ({
+                        factura: item.factura || "No registrada",
+                        orden_compra: item.numero_oc || "No registrada",
+                        proveedor: item.proveedor || "No registrado",
+                        ruc: item.ruc || "",
+                        evento: item.evento || "No registrado",
+                        cuenta_bn: item.cuenta_bn || "",
+                        codigo: item.codigo_detraccion || "",
+                        porcentaje: item.porcentaje_detraccion ?? 0,
+                        monto: Number(item.monto || 0).toFixed(2),
+                        fecha_programada: item.fecha_programada || "",
+                        estado: textoEstado(item.estado),
+                      }))
+                    );
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#102033] shadow-sm transition hover:bg-slate-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Descargar CSV
+                </button>
+              </div>
+
+              {detraccionesPendientesPago.length === 0 ? (
+                <div className="p-8 text-center text-sm text-slate-500">
+                  No hay detracciones pendientes de pago.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1100px] text-sm">
+                    <thead className="bg-amber-50 text-slate-600">
+                      <tr>
+                        <th className="px-5 py-3 text-left">Factura</th>
+                        <th className="px-5 py-3 text-left">OC</th>
+                        <th className="px-5 py-3 text-left">Proveedor</th>
+                        <th className="px-5 py-3 text-left">RUC</th>
+                        <th className="px-5 py-3 text-left">Cuenta BN</th>
+                        <th className="px-5 py-3 text-left">%</th>
+                        <th className="px-5 py-3 text-right">Monto</th>
+                        <th className="px-5 py-3 text-left">Fecha programada</th>
+                        <th className="px-5 py-3 text-left">Estado</th>
+                        <th className="px-5 py-3 text-right">Acción</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {detraccionesPendientesPago.map((item) => (
+                        <tr
+                          key={item.programacion_id}
+                          className="border-t border-slate-100"
+                        >
+                          <td className="px-5 py-4 font-semibold text-[#102033]">
+                            {item.factura || "No registrada"}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            {item.numero_oc || "No registrada"}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            {item.proveedor || "No registrado"}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            {item.ruc || "No registrado"}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            {item.cuenta_bn || "No registrada"}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            {Number(
+                              item.porcentaje_detraccion ?? 0
+                            ).toFixed(2)}
+                            %
+                          </td>
+
+                          <td className="px-5 py-4 text-right font-bold text-[#102033]">
+                            {formatearMoneda(
+                              item.monto,
+                              item.moneda || "PEN"
+                            )}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            {formatearFecha(item.fecha_programada)}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${claseEstado(
+                                item.estado
+                              )}`}
+                            >
+                              {textoEstado(item.estado)}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4 text-right">
+                            <Link
+                              href={`/pagos/registrar?programacion_pago_id=${item.programacion_id}`}
+                              className="inline-flex items-center rounded-lg bg-[#2F73D9] px-3 py-2 text-xs font-semibold text-white hover:bg-[#245DB3]"
+                            >
+                              Registrar pago
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Filtros */}
 
@@ -1622,7 +1855,8 @@ function ResumenCard({
   | "pendiente"
   | "programado"
   | "pagado"
-  | "vencido";
+  | "vencido"
+  | "detraccion";
 }) {
   const estilos = {
     pendiente:
@@ -1633,6 +1867,8 @@ function ResumenCard({
       "border-emerald-200 bg-emerald-50 text-emerald-700",
     vencido:
       "border-red-200 bg-red-50 text-red-700",
+    detraccion:
+      "border-amber-200 bg-amber-50 text-amber-700",
   };
 
   return (
