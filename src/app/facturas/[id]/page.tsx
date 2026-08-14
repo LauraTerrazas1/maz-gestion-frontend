@@ -116,6 +116,13 @@ export default function DetalleFacturaPage() {
     const [subiendoXml, setSubiendoXml] = useState(false);
     const [error, setError] = useState("");
     const [mensaje, setMensaje] = useState("");
+    const [editandoMontos, setEditandoMontos] = useState(false);
+    const [guardandoMontos, setGuardandoMontos] = useState(false);
+
+    const [totalEditado, setTotalEditado] = useState("");
+    const [proveedorEditado, setProveedorEditado] = useState("");
+    const [detraccionEditada, setDetraccionEditada] = useState("");
+
 
     async function cargarFactura() {
         try {
@@ -224,6 +231,121 @@ export default function DetalleFacturaPage() {
         }
 
         event.target.value = "";
+    }
+
+    function iniciarEdicionMontos() {
+        if (!factura) return;
+
+        const total = Number(factura.total || 0);
+        const detraccion = Number(factura.monto_detraccion || 0);
+
+        setTotalEditado(total.toFixed(2));
+        setDetraccionEditada(detraccion.toFixed(2));
+        setProveedorEditado(
+            Math.max(total - detraccion, 0).toFixed(2)
+        );
+
+        setEditandoMontos(true);
+    }
+
+    function cambiarTotal(valor: string) {
+        setTotalEditado(valor);
+
+        const total = Number(valor || 0);
+        const detraccion = Number(detraccionEditada || 0);
+
+        setProveedorEditado(
+            Math.max(total - detraccion, 0).toFixed(2)
+        );
+    }
+
+    function cambiarProveedor(valor: string) {
+        setProveedorEditado(valor);
+
+        const total = Number(totalEditado || 0);
+        const proveedor = Number(valor || 0);
+
+        setDetraccionEditada(
+            Math.max(total - proveedor, 0).toFixed(2)
+        );
+    }
+
+    function cambiarDetraccion(valor: string) {
+        setDetraccionEditada(valor);
+
+        const total = Number(totalEditado || 0);
+        const detraccion = Number(valor || 0);
+
+        setProveedorEditado(
+            Math.max(total - detraccion, 0).toFixed(2)
+        );
+    }
+
+    async function guardarMontos() {
+        if (!factura) return;
+
+        const total = Number(totalEditado);
+        const proveedor = Number(proveedorEditado);
+        const detraccion = Number(detraccionEditada);
+
+        if (
+            !Number.isFinite(total) ||
+            !Number.isFinite(proveedor) ||
+            !Number.isFinite(detraccion) ||
+            total <= 0 ||
+            proveedor < 0 ||
+            detraccion < 0
+        ) {
+            setError("Revisa los montos ingresados.");
+            return;
+        }
+
+        if (Math.abs(proveedor + detraccion - total) > 0.01) {
+            setError(
+                "El pago al proveedor más la detracción debe ser igual al total de la factura."
+            );
+            return;
+        }
+
+        try {
+            setGuardandoMontos(true);
+            setError("");
+            setMensaje("");
+
+            const porcentaje =
+                total > 0
+                    ? Number(((detraccion / total) * 100).toFixed(2))
+                    : 0;
+
+            await apiFetch(`/facturas/${factura.id}`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    total,
+                    monto_detraccion: detraccion,
+                    porcentaje_detraccion: porcentaje,
+                    tiene_detraccion: detraccion > 0,
+                    estado_detraccion:
+                        detraccion > 0
+                            ? "detectada"
+                            : "no_detectada",
+                }),
+            });
+
+            await cargarFactura();
+
+            setEditandoMontos(false);
+            setMensaje("Montos actualizados correctamente.");
+        } catch (error) {
+            console.error(error);
+
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : "No se pudieron actualizar los montos."
+            );
+        } finally {
+            setGuardandoMontos(false);
+        }
     }
 
     if (cargando) {
@@ -376,6 +498,16 @@ export default function DetalleFacturaPage() {
                                                 Con detracción
                                             </span>
                                         )}
+
+                                        {!editandoMontos && (
+                                            <button
+                                                type="button"
+                                                onClick={iniciarEdicionMontos}
+                                                className="ml-2 inline-flex items-center justify-center rounded-lg border border-[#2F73D9] bg-white px-3 py-1.5 text-xs font-semibold text-[#2F73D9] transition hover:bg-blue-50"
+                                            >
+                                                Editar montos
+                                            </button>
+                                        )}
                                     </div>
 
                                     <p className="mt-1 text-xs text-slate-500">
@@ -396,7 +528,83 @@ export default function DetalleFacturaPage() {
                                     </p>
                                 </div>
                             </div>
+                            {editandoMontos && (
+                                <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+                                    <p className="mb-4 text-sm font-semibold text-[#102033]">
+                                        Editar distribución de la factura
+                                    </p>
 
+                                    <div className="grid gap-4 md:grid-cols-3">
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-500">
+                                                Total factura
+                                            </label>
+
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={totalEditado}
+                                                onChange={(e) => cambiarTotal(e.target.value)}
+                                                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-500">
+                                                Pago al proveedor
+                                            </label>
+
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={proveedorEditado}
+                                                onChange={(e) => cambiarProveedor(e.target.value)}
+                                                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-500">
+                                                Depósito de detracción
+                                            </label>
+
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={detraccionEditada}
+                                                onChange={(e) => cambiarDetraccion(e.target.value)}
+                                                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <p className="mt-3 text-xs text-slate-500">
+                                        Al modificar el pago al proveedor o la detracción,
+                                        el otro monto se recalcula automáticamente.
+                                    </p>
+
+                                    <div className="mt-4 flex justify-end gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditandoMontos(false)}
+                                            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600"
+                                        >
+                                            Cancelar
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={guardarMontos}
+                                            disabled={guardandoMontos}
+                                            className="rounded-lg bg-[#2F73D9] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                                        >
+                                            {guardandoMontos
+                                                ? "Guardando..."
+                                                : "Guardar cambios"}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                             <div className="mt-6 grid gap-4 md:grid-cols-2">
                                 <div className="rounded-xl border border-slate-200 p-5">
                                     <div className="flex items-center gap-3">
