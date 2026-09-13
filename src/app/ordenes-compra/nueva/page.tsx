@@ -66,7 +66,7 @@ export default function NuevaOrdenCompraPage() {
     const [moneda, setMoneda] = useState("PEN");
     const [condicionesPago, setCondicionesPago] = useState("");
     const [porcentajeMaxAdelanto, setPorcentajeMaxAdelanto] = useState("60");
-    const [porcentajeIgv, setPorcentajeIgv] = useState(18);
+    const [porcentajeIgv, setPorcentajeIgv] = useState("18");
     const [observaciones, setObservaciones] = useState("");
     const [requiereFactura, setRequiereFactura] = useState(true);
     const [archivoCotizacion, setArchivoCotizacion] = useState<File | null>(null);
@@ -97,10 +97,10 @@ export default function NuevaOrdenCompraPage() {
             ),
         [items]
     );
-
+    
     const igv = useMemo(
-        () => Number((subtotal * (porcentajeIgv / 100)).toFixed(2)),
-        [subtotal, porcentajeIgv]
+        () => (requiereFactura ? Number((subtotal * (Number(porcentajeIgv || 0) / 100)).toFixed(2)) : 0),
+        [subtotal, porcentajeIgv, requiereFactura]
     );
 
     const total = useMemo(
@@ -295,11 +295,8 @@ export default function NuevaOrdenCompraPage() {
                         moneda,
                         condiciones_pago:
                             condicionesPago.trim() || null,
-                        porcentaje_max_adelanto:
-                            porcentajeMaxAdelanto === ""
-                                ? 0
-                                : Number(porcentajeMaxAdelanto),
-                        porcentaje_igv: porcentajeIgv,
+                        porcentaje_max_adelanto: porcentajeMaxAdelanto === "" ? 0 : Number(porcentajeMaxAdelanto),
+                        porcentaje_igv: porcentajeIgv === "" ? 0 : Number(porcentajeIgv),
                         observaciones: observaciones.trim() || null,
                         requiere_factura: requiereFactura,
                     }),
@@ -663,26 +660,23 @@ export default function NuevaOrdenCompraPage() {
                                     type="number"
                                     min="0"
                                     max="100"
-                                    step="0.01"
+                                    step="any"
                                     value={porcentajeIgv}
-                                    onChange={(event) =>
-                                        setPorcentajeIgv(Number(event.target.value || 0))
-                                    }
-                                    onWheel={(event) => event.currentTarget.blur()}
+                                    onChange={(e) => setPorcentajeIgv(e.target.value)}
+                                    onWheel={(e) => e.currentTarget.blur()}
                                     className={inputClass}
                                 />
                             </Campo>
+
                             <Campo label="Adelanto máximo permitido (%)">
                                 <input
                                     type="number"
                                     min="0"
                                     max="100"
-                                    step="1"
+                                    step="any"
                                     value={porcentajeMaxAdelanto}
-                                    onChange={(event) =>
-                                        setPorcentajeMaxAdelanto(event.target.value)
-                                    }
-                                    onWheel={(event) => event.currentTarget.blur()}
+                                    onChange={(e) => setPorcentajeMaxAdelanto(e.target.value)}
+                                    onWheel={(e) => e.currentTarget.blur()}
                                     className={inputClass}
                                 />
                             </Campo>

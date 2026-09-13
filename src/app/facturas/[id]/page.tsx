@@ -850,7 +850,7 @@ export default function DetalleFacturaPage() {
                     {/* COLUMNA DERECHA */}
                     <aside className="space-y-6">
 
-                        {/* CONFORMIDAD AÚN NO IMPLEMENTADA */}
+                        {/* CONFORMIDAD DINÁMICA */}
                         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                             <div className="border-b border-slate-100 pb-4">
                                 <h2 className="font-semibold text-[#102033]">
@@ -858,27 +858,63 @@ export default function DetalleFacturaPage() {
                                 </h2>
 
                                 <p className="mt-1 text-xs text-slate-500">
-                                    Próximo paso del flujo.
+                                    Estado del flujo de aprobación.
                                 </p>
                             </div>
 
                             <div className="mt-5">
-                                <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                                    Pendiente
-                                </span>
+                                {/* BADGE DE ESTADO */}
+                                {factura.estado_conformidad?.toUpperCase() === "APROBADO" ||
+                                    factura.estado_conformidad?.toUpperCase() === "CONFORME" ||
+                                    factura.estado?.toUpperCase() === "PAGADO" ? (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                        {factura.estado_conformidad || "Conforme"}
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                                        {factura.estado_conformidad || "Pendiente"}
+                                    </span>
+                                )}
 
+                                {/* MENSAJE EXPLICATIVO */}
                                 <p className="mt-3 text-sm leading-6 text-slate-500">
-                                    La factura deberá aprobarse antes de programar
-                                    sus pagos.
+                                    {factura.estado_conformidad?.toUpperCase() === "APROBADO" ||
+                                        factura.estado_conformidad?.toUpperCase() === "CONFORME" ||
+                                        factura.estado?.toUpperCase() === "PAGADO"
+                                        ? "La factura cuenta con la conformidad registrada y está aprobada."
+                                        : "La factura deberá aprobarse antes de programar sus pagos."}
                                 </p>
+
+                                {/* OBSERVACIÓN DE CONFORMIDAD */}
+                                {factura.observacion_conformidad && (
+                                    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                                        <strong className="block font-semibold text-slate-700 mb-1">Nota de conformidad:</strong>
+                                        {factura.observacion_conformidad}
+                                    </div>
+                                )}
                             </div>
 
+                            {/* BOTÓN CON ACCIÓN O ESTADO FINALIZADO */}
                             <button
                                 type="button"
-                                disabled
-                                className="mt-5 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-400"
+                                disabled={
+                                    factura.estado_conformidad?.toUpperCase() === "APROBADO" ||
+                                    factura.estado_conformidad?.toUpperCase() === "CONFORME" ||
+                                    factura.estado?.toUpperCase() === "PAGADO"
+                                }
+                                className={`mt-5 w-full rounded-xl border px-4 py-3 text-sm font-semibold transition ${factura.estado_conformidad?.toUpperCase() === "APROBADO" ||
+                                        factura.estado_conformidad?.toUpperCase() === "CONFORME" ||
+                                        factura.estado?.toUpperCase() === "PAGADO"
+                                        ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                                        : "border-[#2F73D9] bg-[#2F73D9] text-white hover:bg-blue-600"
+                                    }`}
                             >
-                                Gestionar conformidad
+                                {factura.estado_conformidad?.toUpperCase() === "APROBADO" ||
+                                    factura.estado_conformidad?.toUpperCase() === "CONFORME" ||
+                                    factura.estado?.toUpperCase() === "PAGADO"
+                                    ? "Conformidad Registrada"
+                                    : "Gestionar conformidad"}
                             </button>
                         </section>
 

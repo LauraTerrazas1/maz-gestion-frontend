@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import MainLayout from "@/components/layout/MainLayout";
+import Modal from "@/components/ui/Modal";
 import { apiFetch } from "@/lib/api";
 
 type Factura = {
@@ -27,6 +28,12 @@ type Factura = {
     diferencia_oc: number | string | null;
     monto_coincide: boolean | null;
     tipo_factura: string | null;
+    ordenes_compra?: {
+        numero_oc?: string;
+        proveedores?: {
+            razon_social?: string;
+        };
+    };
 };
 
 function formatearMonto(
@@ -97,7 +104,14 @@ export default function FacturasPage() {
     const [documentoFiltro, setDocumentoFiltro] = useState("");
 
     const [cargando, setCargando] = useState(true);
+    const [eliminandoId, setEliminandoId] = useState<string | null>(null);
     const [error, setError] = useState("");
+
+    // Estado para controlar el modal de confirmación
+    const [facturaAEliminar, setFacturaAEliminar] = useState<{
+        id: string;
+        comprobante: string;
+    } | null>(null);
 
     async function cargarFacturas() {
         try {
@@ -109,24 +123,43 @@ export default function FacturasPage() {
                 apiFetch("/ordenes-compra/disponibles-facturacion"),
             ]);
 
-            setFacturas(Array.isArray(data) ? data : []);
+            const listaFacturas = Array.isArray(data)
+                ? data
+                : Array.isArray(data?.facturas)
+                    ? data.facturas
+                    : [];
+
+            setFacturas(listaFacturas);
 
             setFacturasPendientes(
                 Array.isArray(pendientesData) ? pendientesData.length : 0
-            );
-
-            setFacturas(
-                Array.isArray(data)
-                    ? data
-                    : Array.isArray(data?.facturas)
-                        ? data.facturas
-                        : []
             );
         } catch (error) {
             console.error("Error cargando facturas:", error);
             setError("No se pudieron cargar las facturas.");
         } finally {
             setCargando(false);
+        }
+    }
+
+    async function confirmarEliminacion() {
+        if (!facturaAEliminar) return;
+
+        const { id } = facturaAEliminar;
+
+        try {
+            setEliminandoId(id);
+            await apiFetch(`/facturas/${id}`, {
+                method: "DELETE",
+            });
+
+            setFacturas((prev) => prev.filter((f) => f.id !== id));
+            setFacturaAEliminar(null);
+        } catch (err: any) {
+            console.error("Error al eliminar factura:", err);
+            alert(err.message || "Error al intentar eliminar la factura.");
+        } finally {
+            setEliminandoId(null);
         }
     }
 
@@ -137,13 +170,25 @@ export default function FacturasPage() {
     const facturasFiltradas = useMemo(() => {
         const texto = buscar.trim().toLowerCase();
 
-        return facturas.filter((factura) => {
-            const comprobante = `${factura.serie || ""}-${factura.numero || ""
-                }`.toLowerCase();
+        return facturas.filter((factura: any) => {
+            const comprobante = `${factura.serie || ""}-${factura.numero || ""}`.toLowerCase();
+            const oc = factura.ordenes_compra;
+            const codigoOc = (
+                oc?.numero_oc ||
+                factura.orden_compra_id ||
+                ""
+            ).toLowerCase();
+
+            const proveedorNombre = (
+                oc?.proveedores?.razon_social ||
+                ""
+            ).toLowerCase();
 
             const coincideBusqueda =
                 !texto ||
                 comprobante.includes(texto) ||
+                codigoOc.includes(texto) ||
+                proveedorNombre.includes(texto) ||
                 factura.tipo_comprobante?.toLowerCase().includes(texto) ||
                 factura.estado_conformidad?.toLowerCase().includes(texto) ||
                 factura.estado_detraccion?.toLowerCase().includes(texto);
@@ -154,16 +199,13 @@ export default function FacturasPage() {
 
             const coincideDocumento =
                 !documentoFiltro ||
-                (documentoFiltro === "pdf" &&
-                    Boolean(factura.archivo_pdf_url)) ||
-                (documentoFiltro === "xml" &&
-                    Boolean(factura.archivo_xml_url)) ||
+                (documentoFiltro === "pdf" && Boolean(factura.archivo_pdf_url)) ||
+                (documentoFiltro === "xml" && Boolean(factura.archivo_xml_url)) ||
                 (documentoFiltro === "ambos" &&
                     Boolean(factura.archivo_pdf_url) &&
                     Boolean(factura.archivo_xml_url)) ||
                 (documentoFiltro === "incompletos" &&
-                    (!factura.archivo_pdf_url ||
-                        !factura.archivo_xml_url));
+                    (!factura.archivo_pdf_url || !factura.archivo_xml_url));
 
             return (
                 coincideBusqueda &&
@@ -171,12 +213,7 @@ export default function FacturasPage() {
                 coincideDocumento
             );
         });
-    }, [
-        facturas,
-        buscar,
-        estadoFiltro,
-        documentoFiltro,
-    ]);
+    }, [facturas, buscar, estadoFiltro, documentoFiltro]);
 
     function limpiarFiltros() {
         setBuscar("");
@@ -214,6 +251,7 @@ export default function FacturasPage() {
                         </button>
                     </div>
                 </div>
+
                 <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
                     <p className="text-sm font-medium text-amber-700">
                         Facturas pendientes de subir
@@ -227,6 +265,7 @@ export default function FacturasPage() {
                         Órdenes de compra con facturación pendiente
                     </p>
                 </div>
+
                 <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <div className="xl:col-span-2">
@@ -258,18 +297,10 @@ export default function FacturasPage() {
                                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#102033] outline-none transition focus:border-[#2F73D9] focus:ring-2 focus:ring-blue-100"
                             >
                                 <option value="">Todos los estados</option>
-                                <option value="pendiente">
-                                    Pendiente
-                                </option>
-                                <option value="aprobada">
-                                    Aprobada
-                                </option>
-                                <option value="observada">
-                                    Observada
-                                </option>
-                                <option value="rechazada">
-                                    Rechazada
-                                </option>
+                                <option value="pendiente">Pendiente</option>
+                                <option value="aprobada">Aprobada</option>
+                                <option value="observada">Observada</option>
+                                <option value="rechazada">Rechazada</option>
                             </select>
                         </div>
 
@@ -356,54 +387,29 @@ export default function FacturasPage() {
                             <table className="w-full min-w-[1050px] text-left text-sm">
                                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                                     <tr>
-                                        <th className="px-6 py-4">
-                                            Comprobante
-                                        </th>
-
-                                        <th className="px-6 py-4">
-                                            Fecha
-                                        </th>
-
-                                        <th className="px-6 py-4">
-                                            Documentos
-                                        </th>
-
-                                        <th className="px-6 py-4">
-                                            Conformidad
-                                        </th>
-
-                                        <th className="px-6 py-4">
-                                            Detracción
-                                        </th>
-
-                                        <th className="px-6 py-4">
-                                            Pago proveedor
-                                        </th>
-
-                                        <th className="px-6 py-4 text-right">
-                                            Total
-                                        </th>
-
-                                        <th className="px-6 py-4 text-right">
-                                            Acción
-                                        </th>
+                                        <th className="px-6 py-4">Comprobante</th>
+                                        <th className="px-6 py-4">Fecha</th>
+                                        <th className="px-6 py-4">Documentos</th>
+                                        <th className="px-6 py-4">Conformidad</th>
+                                        <th className="px-6 py-4">Detracción</th>
+                                        <th className="px-6 py-4">Pago proveedor</th>
+                                        <th className="px-6 py-4 text-right">Total</th>
+                                        <th className="px-6 py-4 text-right">Acción</th>
                                     </tr>
                                 </thead>
 
                                 <tbody>
-                                    {facturasFiltradas.map((factura) => {
+                                    {facturasFiltradas.map((factura: any) => {
                                         const comprobante =
                                             factura.serie && factura.numero
                                                 ? `${factura.serie}-${factura.numero}`
                                                 : "Pendiente de lectura";
                                         const total = Number(factura.total || 0);
-
                                         const detraccion = Number(
                                             factura.monto_detraccion || 0
                                         );
+                                        const pagoProveedor = total - detraccion;
 
-                                        const pagoProveedor =
-                                            total - detraccion;
                                         return (
                                             <tr
                                                 key={factura.id}
@@ -414,24 +420,25 @@ export default function FacturasPage() {
                                                         {comprobante}
                                                     </p>
 
-                                                    <p className="mt-1 text-xs text-slate-500">
-                                                        {factura.tipo_comprobante ||
-                                                            "Factura"}
+                                                    <p className="mt-0.5 text-xs font-semibold text-[#2F73D9]">
+                                                        {factura.ordenes_compra?.proveedores?.razon_social || "Sin Proveedor"}
+                                                    </p>
+
+                                                    <p className="mt-0.5 text-xs text-slate-500">
+                                                        OC: {factura.ordenes_compra?.numero_oc || "S/N"} • {factura.tipo_comprobante || "Factura"}
                                                     </p>
                                                 </td>
 
                                                 <td className="px-6 py-4 text-slate-600">
-                                                    {formatearFecha(
-                                                        factura.fecha_emision
-                                                    )}
+                                                    {formatearFecha(factura.fecha_emision)}
                                                 </td>
 
                                                 <td className="px-6 py-4">
                                                     <div className="flex gap-2">
                                                         <span
                                                             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${factura.archivo_pdf_url
-                                                                ? "bg-red-50 text-red-600"
-                                                                : "bg-slate-100 text-slate-400"
+                                                                    ? "bg-red-50 text-red-600"
+                                                                    : "bg-slate-100 text-slate-400"
                                                                 }`}
                                                         >
                                                             PDF
@@ -439,8 +446,8 @@ export default function FacturasPage() {
 
                                                         <span
                                                             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${factura.archivo_xml_url
-                                                                ? "bg-blue-50 text-blue-600"
-                                                                : "bg-slate-100 text-slate-400"
+                                                                    ? "bg-blue-50 text-blue-600"
+                                                                    : "bg-slate-100 text-slate-400"
                                                                 }`}
                                                         >
                                                             XML
@@ -454,17 +461,14 @@ export default function FacturasPage() {
                                                             factura.estado_conformidad
                                                         )}`}
                                                     >
-                                                        {textoConformidad(
-                                                            factura.estado_conformidad
-                                                        )}
+                                                        {textoConformidad(factura.estado_conformidad)}
                                                     </span>
                                                 </td>
 
                                                 <td className="px-6 py-4 text-slate-600">
-                                                    {textoDetraccion(
-                                                        factura.estado_detraccion
-                                                    )}
+                                                    {textoDetraccion(factura.estado_detraccion)}
                                                 </td>
+
                                                 <td className="px-6 py-4">
                                                     <p className="font-semibold text-[#102033]">
                                                         {formatearMonto(
@@ -487,20 +491,48 @@ export default function FacturasPage() {
                                                         </p>
                                                     )}
                                                 </td>
+
                                                 <td className="px-6 py-4 text-right font-bold text-[#102033]">
-                                                    {formatearMonto(
-                                                        factura.total,
-                                                        factura.moneda
-                                                    )}
+                                                    {formatearMonto(factura.total, factura.moneda)}
                                                 </td>
 
                                                 <td className="px-6 py-4 text-right">
-                                                    <Link
-                                                        href={`/facturas/${factura.id}`}
-                                                        className="font-semibold text-[#2F73D9] transition hover:text-[#245DB3]"
-                                                    >
-                                                        Ver detalle →
-                                                    </Link>
+                                                    <div className="flex items-center justify-end gap-3">
+                                                        <Link
+                                                            href={`/facturas/${factura.id}`}
+                                                            className="font-semibold text-[#2F73D9] transition hover:text-[#245DB3]"
+                                                        >
+                                                            Ver detalle →
+                                                        </Link>
+
+                                                        {/* Botón Tacho de Basura en Rojo */}
+                                                        <button
+                                                            type="button"
+                                                            title="Eliminar factura"
+                                                            onClick={() =>
+                                                                setFacturaAEliminar({
+                                                                    id: factura.id,
+                                                                    comprobante,
+                                                                })
+                                                            }
+                                                            className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 transition"
+                                                        >
+                                                            <svg
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                fill="none"
+                                                                viewBox="0 0 24 24"
+                                                                strokeWidth={1.5}
+                                                                stroke="currentColor"
+                                                                className="w-5 h-5"
+                                                            >
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                                                />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -510,6 +542,45 @@ export default function FacturasPage() {
                         </div>
                     )}
                 </section>
+
+                {/* Modal reutilizable de confirmación */}
+                <Modal
+                    open={Boolean(facturaAEliminar)}
+                    title="Confirmar eliminación"
+                    width="sm"
+                    onClose={() => setFacturaAEliminar(null)}
+                >
+                    <div className="space-y-4">
+                        <p className="text-sm text-slate-600">
+                            ¿Estás seguro de que deseas eliminar la factura{" "}
+                            <span className="font-semibold text-[#102033]">
+                                {facturaAEliminar?.comprobante}
+                            </span>
+                            ? Esta acción no se puede deshacer.
+                        </p>
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                type="button"
+                                disabled={eliminandoId === facturaAEliminar?.id}
+                                onClick={() => setFacturaAEliminar(null)}
+                                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                disabled={eliminandoId === facturaAEliminar?.id}
+                                onClick={confirmarEliminacion}
+                                className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {eliminandoId === facturaAEliminar?.id
+                                    ? "Eliminando..."
+                                    : "Sí, eliminar"}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
             </main>
         </MainLayout>
     );

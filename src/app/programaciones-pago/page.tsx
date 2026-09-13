@@ -13,6 +13,7 @@ import {
     Plus,
     Search,
     WalletCards,
+    Trash2,
 } from "lucide-react";
 
 import MainLayout from "@/components/layout/MainLayout";
@@ -317,6 +318,38 @@ function descargarCSV(
 }
 
 export default function ProgramacionesPagoPage() {
+
+    const [itemAEliminar, setItemAEliminar] = useState<any>(null);
+    const [cargandoEliminacion, setCargandoEliminacion] = useState<boolean>(false);
+
+    // Función para confirmar la eliminación
+    const handleConfirmarEliminar = async () => {
+        if (!itemAEliminar) return;
+        setCargandoEliminacion(true);
+        try {
+            await apiFetch(`/programaciones-pago/${itemAEliminar.id}`, {
+                method: 'DELETE'
+            });
+
+            // Actualiza la lista en pantalla quitando el elemento
+            setProgramaciones((prev) => prev.filter((p) => p.id !== itemAEliminar.id));
+
+            setToast({
+                tipo: "success",
+                mensaje: "Programación eliminada correctamente.",
+            });
+            setItemAEliminar(null);
+        } catch (error) {
+            console.error("Error al eliminar:", error);
+            setToast({
+                tipo: "error",
+                mensaje: "No se pudo eliminar la programación.",
+            });
+        } finally {
+            setCargandoEliminacion(false);
+        }
+    };
+
     const [
         programaciones,
         setProgramaciones,
@@ -1496,13 +1529,26 @@ export default function ProgramacionesPagoPage() {
                                                             ].includes(
                                                                 programacion.estado
                                                             ) ? (
-                                                                <Link
-                                                                    href={`/pagos/registrar?programacion_pago_id=${programacion.id}`}
-                                                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2F73D9] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#245DB3]"
-                                                                >
-                                                                    <WalletCards className="h-4 w-4" />
-                                                                    Registrar pago
-                                                                </Link>
+                                                                <div className="inline-flex items-center justify-end gap-2">
+                                                                    {/* Botón Registrar Pago */}
+                                                                    <Link
+                                                                        href={`/pagos/registrar?programacion_pago_id=${programacion.id}`}
+                                                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2F73D9] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#245DB3]"
+                                                                    >
+                                                                        <WalletCards className="h-4 w-4" />
+                                                                        Registrar pago
+                                                                    </Link>
+
+                                                                    {/* NUEVO: Botón Eliminar */}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setItemAEliminar(programacion)}
+                                                                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                        Eliminar
+                                                                    </button>
+                                                                </div>
                                                             ) : (
                                                                 <span className="text-xs font-medium text-slate-400">
                                                                     Sin acciones
@@ -1519,7 +1565,37 @@ export default function ProgramacionesPagoPage() {
                         )}
                     </section>
                 </div>
-
+                {/* Modal de confirmación para eliminar */}
+                {itemAEliminar && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+                        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                            <h3 className="text-lg font-bold text-[#102033]">
+                                ¿Eliminar programación?
+                            </h3>
+                            <p className="mt-2 text-sm text-slate-500">
+                                Esta acción eliminará el registro de la programación de pago permanentemente. ¿Deseas continuar?
+                            </p>
+                            <div className="mt-6 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setItemAEliminar(null)}
+                                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        await handleConfirmarEliminar();
+                                    }}
+                                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                                >
+                                    {cargandoEliminacion ? "Eliminando..." : "Confirmar eliminación"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {toast && (
                     <Toast
                         tipo={toast.tipo}

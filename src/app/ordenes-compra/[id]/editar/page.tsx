@@ -63,9 +63,8 @@ export default function EditarOrdenCompraPage() {
   const [fechaRequerida, setFechaRequerida] = useState("");
   const [moneda, setMoneda] = useState("PEN");
   const [condicionesPago, setCondicionesPago] = useState("");
-  const [porcentajeIgv, setPorcentajeIgv] = useState(18);
-  const [porcentajeMaxAdelanto, setPorcentajeMaxAdelanto] =
-    useState("60");
+  const [porcentajeMaxAdelanto, setPorcentajeMaxAdelanto] = useState("60");
+  const [porcentajeIgv, setPorcentajeIgv] = useState("18")
   const [observaciones, setObservaciones] = useState("");
   const [requiereFactura, setRequiereFactura] = useState(true);
 
@@ -101,7 +100,7 @@ export default function EditarOrdenCompraPage() {
   );
 
   const igv = useMemo(
-    () => Number((subtotal * (porcentajeIgv / 100)).toFixed(2)),
+    () => Number((subtotal * (Number(porcentajeIgv || 0) / 100)).toFixed(2)),
     [subtotal, porcentajeIgv]
   );
 
@@ -159,12 +158,8 @@ export default function EditarOrdenCompraPage() {
         setCondicionesPago(
           data.condiciones_pago || ""
         );
-        setPorcentajeIgv(
-          Number(data.porcentaje_igv ?? 18)
-        );
-        setPorcentajeMaxAdelanto(
-          String(data.porcentaje_max_adelanto ?? 60)
-        );
+        setPorcentajeMaxAdelanto(String(data.porcentaje_max_adelanto ?? 60));
+        setPorcentajeIgv(String(data.porcentaje_igv ?? 18));
         setObservaciones(data.observaciones || "");
         setRequiereFactura(
           data.requiere_factura !== false
@@ -396,13 +391,10 @@ export default function EditarOrdenCompraPage() {
           moneda,
           condiciones_pago:
             condicionesPago.trim() || null,
-          porcentaje_igv: porcentajeIgv,
-          porcentaje_max_adelanto:
-            porcentajeMaxAdelanto === ""
-              ? 0
-              : Number(porcentajeMaxAdelanto),
-          observaciones:
-            observaciones.trim() || null,
+          porcentaje_max_adelanto: porcentajeMaxAdelanto === "" ? 0 : Number(porcentajeMaxAdelanto),
+          porcentaje_igv: porcentajeIgv === "" ? 0 : Number(porcentajeIgv),
+
+          observaciones: observaciones.trim() || null,
           requiere_factura: requiereFactura,
         }),
       });
@@ -785,12 +777,10 @@ export default function EditarOrdenCompraPage() {
                   type="number"
                   min="0"
                   max="100"
-                  step="0.01"
+                  step="any"
                   value={porcentajeIgv}
-                  onChange={(event) =>
-                    setPorcentajeIgv(Number(event.target.value || 0))
-                  }
-                  onWheel={(event) => event.currentTarget.blur()}
+                  onChange={(e) => setPorcentajeIgv(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   className={inputClass}
                 />
               </Campo>
@@ -799,12 +789,10 @@ export default function EditarOrdenCompraPage() {
                   type="number"
                   min="0"
                   max="100"
-                  step="1"
+                  step="any"
                   value={porcentajeMaxAdelanto}
-                  onChange={(event) =>
-                    setPorcentajeMaxAdelanto(event.target.value)
-                  }
-                  onWheel={(event) => event.currentTarget.blur()}
+                  onChange={(e) => setPorcentajeMaxAdelanto(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   className={inputClass}
                 />
               </Campo>
